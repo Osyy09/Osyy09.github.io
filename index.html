@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kripto Potansiyel Hesaplayıcı</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="container">
+        <h1>Kripto Potansiyel Hesaplayıcı</h1>
+        <p class="description">
+            Bir altcoin'in geçmiş dönemdeki piyasa değeri zirvesini kullanarak, bugünkü potansiyel fiyatını ve getirisini hesaplayın.
+        </p>
+
+        <div class="input-group">
+            <label for="gecmisPiyasaDegeri">Geçmişteki Piyasa Değeri Zirvesi (USD):</label>
+            <input type="number" id="gecmisPiyasaDegeri" placeholder="Örn: 50000000000" min="0">
+        </div>
+
+        <div class="input-group">
+            <label for="bugunkuArz">Bugünkü Dolaşımdaki Arz:</label>
+            <input type="number" id="bugunkuArz" placeholder="Örn: 1200000000" min="0">
+        </div>
+
+        <div class="input-group">
+            <label for="maliyetFiyati">Ortalama Maliyet Fiyatı (İsteğe Bağlı):</label>
+            <input type="number" id="maliyetFiyati" placeholder="Örn: 0.85" min="0">
+        </div>
+        
+        <button onclick="hesapla()">Potansiyel Fiyatı Hesapla</button>
+
+        <div id="sonucAlani" class="sonuc-area">
+            </div>
+
+        <p class="footer-text">
+            "Çağatay Der ki Official Group Üyeleri Adına Derlenmiştir"
+        </p>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
