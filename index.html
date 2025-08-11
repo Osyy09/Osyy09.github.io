@@ -13,21 +13,19 @@
         <div class="card api-card">
             <h2>API Ayarları</h2>
             <input type="text" id="etherscanApiKey" placeholder="Etherscan API Anahtarınızı Girin">
-            <input type="text" id="mobulaApiKey" placeholder="Mobula API Anahtarınızı Girin">
-            <button onclick="saveApiKeys()">API Anahtarlarını Kaydet</button>
+            <button onclick="saveApiKeys()">API Anahtarını Kaydet</button>
         </div>
         
         <div class="card tracking-card">
-            <h2>Kripto Para Takibi</h2>
-            <input type="text" id="contractAddress" placeholder="Sözleşme Adresini Girin">
-            <button onclick="fetchTransactions()">İşlemleri Getir</button>
-        </div>
-        
-        <div class="transaction-list-container">
-            <h2>İşlemler</h2>
-            <div id="transactionsList">
-                <p>İşlemler buraya listelenecektir...</p>
+            <h2>Koin Takibi</h2>
+            <div id="coinCountInput">
+                <input type="number" id="numberOfCoins" placeholder="Kaç Koin Takip Edilecek?">
+                <button onclick="createCoinInputs()">Alanları Oluştur</button>
             </div>
+            <div id="coinInputsContainer"></div>
+            <button id="saveCoinsBtn" style="display:none;" onclick="saveCoinConfigs()">Coinleri Kaydet</button>
+            <hr>
+            <div id="coinButtonsContainer"></div>
         </div>
     </div>
 
