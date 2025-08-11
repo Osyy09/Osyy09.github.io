@@ -3,49 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gelişmiş Kripto Potansiyel Hesaplayıcı</title>
+    <title>Coin Watcher - İşlem Takibi</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
     <div class="container">
-        <h1>Gelişmiş Kripto Hesaplayıcı</h1>
-        <p class="description">
-            Bir altcoin'in geçmişteki piyasa değeri zirvesini kullanarak, bugünkü potansiyel fiyatını ve getirisini otomatik hesaplayın.
-        </p>
-
-        <div class="input-group">
-            <label for="coinSelect">Kripto Para Birimi Seç:</label>
-            <select id="coinSelect" onchange="coinSecildi()">
-                <option value="">Lütfen bir coin seçin...</option>
-                </select>
-        </div>
-
-        <div id="ralliVerileri" class="ralli-data-area" style="display:none;">
-            <h3>Geçmiş Ralli Verileri</h3>
-            <div class="input-group">
-                <label for="ralliSelect">Ralli Dönemi Seç:</label>
-                <select id="ralliSelect"></select>
-            </div>
+        <h1>Coin Watcher</h1>
+        
+        <div class="card api-card">
+            <h2>API Ayarları</h2>
+            <input type="text" id="etherscanApiKey" placeholder="Etherscan API Anahtarınızı Girin">
+            <button onclick="saveApiKeys()">API Anahtarını Kaydet</button>
         </div>
         
-        <div id="bilgiAlani" style="display:none;">
-            <p>Güncel Dolaşımdaki Arz: <strong id="bugunkuArz">...</strong></p>
-        </div>
-
-        <div class="input-group">
-            <label for="maliyetFiyati">Ortalama Maliyet Fiyatı (İsteğe Bağlı):</label>
-            <input type="number" id="maliyetFiyati" placeholder="Örn: 0.85" min="0">
+        <div class="card tracking-card">
+            <h2>Kripto Para Takibi</h2>
+            <input type="text" id="contractAddress" placeholder="Sözleşme Adresini Girin">
+            <button onclick="fetchTransactions()">İşlemleri Getir</button>
         </div>
         
-        <button onclick="hesapla()">Potansiyel Fiyatı Hesapla</button>
-
-        <div id="sonucAlani" class="sonuc-area">
+        <div class="transaction-list-container">
+            <h2>İşlemler</h2>
+            <div id="transactionsList">
+                <p>İşlemler buraya listelenecektir...</p>
             </div>
-
-        <p class="footer-text">
-            "Çağatay Der ki Official Group Üyeleri Adına Derlenmiştir"
-        </p>
+        </div>
     </div>
 
     <script src="script.js"></script>
