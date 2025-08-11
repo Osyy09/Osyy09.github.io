@@ -1,28 +1,31 @@
-// API Anahtarını tarayıcının yerel depolama alanına kaydeder
+// API Anahtarlarını tarayıcının yerel depolama alanına kaydeder
 function saveApiKeys() {
     const etherscanKey = document.getElementById('etherscanApiKey').value;
-    if (etherscanKey) {
+    const mobulaKey = document.getElementById('mobulaApiKey').value;
+
+    if (etherscanKey && mobulaKey) {
         localStorage.setItem('ETHERSCAN_API_KEY', etherscanKey);
-        alert('API Anahtarı başarıyla kaydedildi!');
+        localStorage.setItem('MOBULA_API_KEY', mobulaKey);
+        alert('API Anahtarları başarıyla kaydedildi!');
     } else {
-        alert('Lütfen geçerli bir API anahtarı girin.');
+        alert('Lütfen her iki API anahtarını da girin.');
     }
 }
 
 // API'den işlem verilerini çeker ve listeler
 async function fetchTransactions() {
     const contractAddress = document.getElementById('contractAddress').value;
-    const apiKey = localStorage.getItem('ETHERSCAN_API_KEY');
+    const etherscanApiKey = localStorage.getItem('ETHERSCAN_API_KEY');
 
     const transactionsDiv = document.getElementById('transactionsList');
     transactionsDiv.innerHTML = '<p>Yükleniyor...</p>';
 
-    if (!contractAddress || !apiKey) {
+    if (!contractAddress || !etherscanApiKey) {
         transactionsDiv.innerHTML = '<p>Lütfen sözleşme adresini girin ve API anahtarını kaydedin.</p>';
         return;
     }
 
-    const url = `https://api.etherscan.io/api?module=account&action=tokentx&address=${contractAddress}&apikey=${apiKey}`;
+    const url = `https://api.etherscan.io/api?module=account&action=tokentx&address=${contractAddress}&apikey=${etherscanApiKey}`;
     
     try {
         const response = await fetch(url);
@@ -57,10 +60,15 @@ async function fetchTransactions() {
     }
 }
 
-// Sayfa yüklendiğinde API anahtarını giriş alanına otomatik doldur
+// Sayfa yüklendiğinde API anahtarlarını giriş alanlarına otomatik doldur
 window.onload = function() {
-    const savedApiKey = localStorage.getItem('ETHERSCAN_API_KEY');
-    if (savedApiKey) {
-        document.getElementById('etherscanApiKey').value = savedApiKey;
+    const savedEtherscanKey = localStorage.getItem('ETHERSCAN_API_KEY');
+    if (savedEtherscanKey) {
+        document.getElementById('etherscanApiKey').value = savedEtherscanKey;
+    }
+    
+    const savedMobulaKey = localStorage.getItem('MOBULA_API_KEY');
+    if (savedMobulaKey) {
+        document.getElementById('mobulaApiKey').value = savedMobulaKey;
     }
 };
