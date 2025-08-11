@@ -3,69 +3,95 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gelişmiş Kripto Uygulaması</title>
+    <title>Gelişmiş Kripto Takip ve Hesaplayıcı</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
 
-    <div class="container">
-        <h1>Coin Watcher</h1>
-        
-        <div class="card api-card">
-            <h2>API Ayarları</h2>
-            <input type="text" id="etherscanApiKey" placeholder="Etherscan API Anahtarınızı Girin">
-            <button onclick="saveApiKeys()">API Anahtarını Kaydet</button>
-        </div>
-        
-        <div class="card tracking-card">
-            <h2>Koin Takibi</h2>
-            <div id="coinCountInput">
-                <input type="number" id="numberOfCoins" placeholder="Kaç Koin Takip Edilecek?">
-                <button onclick="createCoinInputs()">Alanları Oluştur</button>
-            </div>
-            <div id="coinInputsContainer"></div>
-            <button id="saveCoinsBtn" style="display:none;" onclick="saveCoinConfigs()">Coinleri Kaydet</button>
-            <hr>
-            <div id="coinButtonsContainer"></div>
-        </div>
-    </div>
-
-    <div class="container">
-        <h1>Gelişmiş Kripto Hesaplayıcı</h1>
-        <p class="description">
-            Bir altcoin'in geçmişteki piyasa değeri zirvesini kullanarak, bugünkü potansiyel fiyatını ve getirisini otomatik hesaplayın.
-        </p>
-
-        <div class="input-group">
-            <label for="coinSelect">Kripto Para Birimi Seç:</label>
-            <select id="coinSelect" onchange="coinSecildi()">
-                <option value="">Lütfen bir coin seçin...</option>
-            </select>
-        </div>
-
-        <div id="ralliVerileri" class="ralli-data-area" style="display:none;">
-            <h3>Geçmiş Ralli Verileri</h3>
+    <div class="main-container">
+        <div class="card">
+            <h1>Coin Watcher</h1>
+            <p class="section-description">Cüzdan hareketlerini takip etmek için API anahtarlarınızı girin ve coinlerinizi ekleyin.</p>
+            
             <div class="input-group">
-                <label for="ralliSelect">Ralli Dönemi Seç:</label>
-                <select id="ralliSelect"></select>
+                <label for="etherscanApiKey">Etherscan API Anahtarı:</label>
+                <input type="text" id="etherscanApiKey" placeholder="Etherscan Anahtarınızı Girin">
             </div>
-        </div>
-        
-        <div id="bilgiAlani" style="display:none;">
-           <p>Güncel Dolaşımdaki Arz: <strong id="bugunkuArz">...</strong></p>
+            
+            <div class="input-group">
+                <label for="mobulaApiKey">Mobula API Anahtarı:</label>
+                <input type="text" id="mobulaApiKey" placeholder="Mobula Anahtarınızı Girin (isteğe bağlı)">
+            </div>
+
+            <button class="primary-button" onclick="saveApiKeys()">API Anahtarlarını Kaydet</button>
+            <hr class="divider">
+            
+            <div class="input-group">
+                <label for="numberOfCoins">Takip Edilecek Coin Sayısı:</label>
+                <div class="inline-input">
+                    <input type="number" id="numberOfCoins" placeholder="Örn: 3">
+                    <button class="secondary-button" onclick="createCoinInputs()">Alanları Oluştur</button>
+                </div>
+            </div>
+
+            <div id="coinInputsContainer"></div>
+            <button id="saveCoinsBtn" class="primary-button" style="display:none;" onclick="saveCoinConfigs()">Coinleri Kaydet ve Başlat</button>
+            <button id="stopTrackingBtn" class="secondary-button" style="display:none;" onclick="stopTracking()">Takibi Durdur</button>
+            
+            <hr class="divider">
+            
+            <div id="coinButtonsContainer" class="coin-buttons-list"></div>
         </div>
 
-        <div class="input-group">
-            <label for="maliyetFiyati">Ortalama Maliyet Fiyatı (İsteğe Bağlı):</label>
-            <input type="number" id="maliyetFiyati" placeholder="Örn: 0.85" min="0">
-        </div>
-        
-        <button onclick="hesapla()">Potansiyel Fiyatı Hesapla</button>
+        <div class="card">
+            <h1>Kripto Potansiyel Hesaplayıcı</h1>
+            <p class="section-description">Bir altcoin'in geçmişteki piyasa değeri zirvesini kullanarak potansiyel fiyatını ve getirisini hesaplayın.</p>
 
-        <div id="sonucAlani" class="sonuc-area"></div>
-        <p class="footer-text">
-            "Çağatay Der ki Official Group Üyeleri Adına Derlenmiştir"
-        </p>
+            <div class="input-group">
+                <label for="coinSelect">Kripto Para Birimi Seç:</label>
+                <select id="coinSelect" onchange="coinSecildi()"></select>
+            </div>
+
+            <div id="ralliVerileri" style="display:none;">
+                <div class="input-group">
+                    <label for="ralliSelect">Ralli Dönemi Seç:</label>
+                    <select id="ralliSelect"></select>
+                </div>
+            </div>
+            
+            <div id="bilgiAlani" class="info-box" style="display:none;">
+               <p>Güncel Dolaşımdaki Arz: <strong id="bugunkuArz">...</strong></p>
+            </div>
+
+            <div class="input-group">
+                <label for="maliyetFiyati">Ortalama Maliyet Fiyatı (İsteğe Bağlı):</label>
+                <input type="number" id="maliyetFiyati" placeholder="Örn: 0.85" min="0">
+            </div>
+            
+            <button class="primary-button" onclick="hesapla()">Potansiyel Fiyatı Hesapla</button>
+
+            <div id="sonucAlani" class="result-box"></div>
+
+            <hr class="divider">
+
+            <h2>Manuel Coin Ekle</h2>
+            <div class="input-group">
+                <label for="manualCoinName">Coin Adı:</label>
+                <input type="text" id="manualCoinName" placeholder="Örn: SHIBA">
+            </div>
+            <div class="input-group">
+                <label for="manualRallyYear">Ralli Dönemi Adı:</label>
+                <input type="text" id="manualRallyYear" placeholder="Örn: 2021 Rallisi">
+            </div>
+            <div class="input-group">
+                <label for="manualAthMarketCap">ATH Piyasa Değeri ($):</label>
+                <input type="number" id="manualAthMarketCap" placeholder="Örn: 41000000000">
+            </div>
+            <button class="secondary-button" onclick="addManualCoin()">Coin'i Ekle</button>
+        </div>
     </div>
 
     <script src="script.js"></script>
