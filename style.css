@@ -34,7 +34,7 @@ h2 {
     margin-bottom: 20px;
 }
 
-input[type="text"] {
+input[type="text"], input[type="number"] {
     width: calc(100% - 22px);
     padding: 10px;
     margin-bottom: 10px;
@@ -58,10 +58,8 @@ button:hover {
     background-color: #0056b3;
 }
 
-#transactionsList p {
-    background-color: #e9e9e9;
-    padding: 10px;
-    border-radius: 5px;
-    border-left: 5px solid #007bff;
+.coin-button {
+    width: calc(50% - 10px);
+    display: inline-block;
     margin-bottom: 10px;
 }
