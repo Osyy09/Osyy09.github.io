@@ -16,12 +16,15 @@
       <input type="password" id="password" class="form-control mb-2" placeholder="Şifre">
       <button onclick="login()" class="btn btn-primary">Giriş</button>
     </div>
-    <div id="dashboard" style="display:none;"></div>
+    <div id="dashboard" style="display:none;">
+      <div id="dashboard-content"></div>
+      <button onclick="logout()" class="btn btn-danger mt-3">Çıkış Yap</button>
+    </div>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js";
-    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-auth.js";
+    import { getAuth, signInAnonymously, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-auth.js";
     import { getFirestore, doc, getDoc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -57,6 +60,18 @@
         }
       } catch (error) {
         alert('Giriş hatası: ' + error.message);
+      }
+    };
+
+    window.logout = async () => {
+      try {
+        await signOut(auth);
+        localStorage.removeItem('currentUser');
+        document.getElementById('login-form').style.display = 'block';
+        document.getElementById('dashboard').style.display = 'none';
+        alert('Çıkış yapıldı!');
+      } catch (error) {
+        alert('Çıkış hatası: ' + error.message);
       }
     };
 
@@ -108,7 +123,7 @@
       } else if (role === 'admin') {
         html = getAdminTable(report.coops) + '<button onclick="window.print()" class="btn btn-success mt-3">Yazdır</button>';
       }
-      document.getElementById('dashboard').innerHTML = html;
+      document.getElementById('dashboard-content').innerHTML = html;
 
       if (role !== 'admin') {
         document.querySelectorAll('.save-btn').forEach(btn => {
