@@ -8,60 +8,103 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <style>
     body {
-      background: linear-gradient(135deg, #e0f7fa, #ffffff);
+      background: linear-gradient(135deg, #fff0f0, #ffffff);
       min-height: 100vh;
+      font-family: 'Arial', sans-serif;
+    }
+    .navbar {
+      background-color: #ff3333;
+      padding: 1rem;
+      border-bottom: 2px solid #cc0000;
+    }
+    .navbar-brand {
+      color: #ffffff;
+      font-weight: bold;
+      font-size: 1.5rem;
     }
     .card {
       border: none;
       border-radius: 15px;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
       background: #ffffff;
-      transition: transform 0.2s;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
     }
     .card:hover {
-      transform: translateY(-5px);
+      transform: translateY(-10px);
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
     }
     .btn-primary {
-      background-color: #007bff;
+      background-color: #ff3333;
       border: none;
+      transition: background-color 0.3s ease;
     }
     .btn-primary:hover {
-      background-color: #0056b3;
+      background-color: #cc0000;
     }
     .btn-warning {
-      background-color: #ffc107;
+      background-color: #ff8533;
       border: none;
+      transition: background-color 0.3s ease;
     }
     .btn-warning:hover {
-      background-color: #e0a800;
+      background-color: #ff6600;
     }
     .btn-danger {
-      background-color: #dc3545;
+      background-color: #ff4d4d;
       border: none;
+      transition: background-color 0.3s ease;
     }
     .btn-danger:hover {
-      background-color: #c82333;
+      background-color: #ff1a1a;
     }
     .form-control {
       border-radius: 10px;
+      border-color: #ff6666;
+      transition: border-color 0.3s ease;
+    }
+    .form-control:focus {
+      border-color: #cc0000;
+      box-shadow: 0 0 5px rgba(255, 51, 51, 0.5);
     }
     h1 {
-      color: #007bff;
+      color: #ff3333;
       font-weight: bold;
-      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+      margin-bottom: 2rem;
     }
     h3 {
-      color: #333;
+      color: #cc0000;
+      font-weight: 600;
     }
     #dashboard-content .card {
-      margin-bottom: 20px;
+      margin-bottom: 25px;
+    }
+    .table {
+      background-color: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .table th, .table td {
+      vertical-align: middle;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    #dashboard, #login-form {
+      animation: fadeIn 0.5s ease-in;
     }
   </style>
 </head>
 <body>
-  <div class="container mt-5">
-    <h1 class="text-center mb-4"><i class="fas fa-tractor"></i> EC Hayvancılık Günlük Rapor Sistemi</h1>
-    <div id="login-form" class="card p-4">
+  <nav class="navbar navbar-expand-lg">
+    <div class="container">
+      <a class="navbar-brand" href="#"><i class="fas fa-leaf"></i> EC Çiftlik Rapor</a>
+    </div>
+  </nav>
+  <div class="container mt-4">
+    <h1 class="text-center"><i class="fas fa-tractor"></i> EC Hayvancılık Günlük Rapor Sistemi</h1>
+    <div id="login-form" class="card p-4 mx-auto" style="max-width: 400px;">
       <h2 class="text-center mb-4">Giriş Yap</h2>
       <div class="mb-3">
         <input type="text" id="username" class="form-control mb-2" placeholder="Kullanıcı Adı">
@@ -73,7 +116,7 @@
     </div>
     <div id="dashboard" style="display:none;" class="mt-4">
       <div id="dashboard-content"></div>
-      <div id="change-credentials" style="display:none;" class="card p-4 mt-3">
+      <div id="change-credentials" style="display:none;" class="card p-4 mx-auto" style="max-width: 400px;">
         <h3 class="mb-3">Şifreyi Değiştir</h3>
         <div id="user-select" style="display:none;" class="mb-3">
           <label for="target-user" class="form-label">Kullanıcı Seç:</label>
@@ -155,7 +198,7 @@
         const coop = userDoc.data().coop;
         const side = userDoc.data().side;
         await loadDashboard(role, coop, side);
-        setupChangeCredentials(role);
+        setupChangeCredentials(role, username);
       } else {
         document.getElementById('login-form').style.display = 'block';
         document.getElementById('dashboard').style.display = 'none';
@@ -247,13 +290,19 @@
       }
     }
 
-    function setupChangeCredentials(role) {
+    function setupChangeCredentials(role, currentUser) {
       const changeCredentialsDiv = document.getElementById('change-credentials');
-      changeCredentialsDiv.style.display = role === 'admin' ? 'block' : 'none';
-
       if (role === 'admin') {
+        changeCredentialsDiv.style.display = 'block';
         document.getElementById('user-select').style.display = 'block';
         loadUserList();
+      } else if (role === 'keeper') {
+        const hasChanged = localStorage.getItem(`passwordChanged_${currentUser}`) === 'true';
+        changeCredentialsDiv.style.display = hasChanged ? 'none' : 'block';
+        document.getElementById('user-select').style.display = 'none';
+      } else if (role === 'duty') {
+        changeCredentialsDiv.style.display = 'block';
+        document.getElementById('user-select').style.display = 'none';
       }
     }
 
@@ -276,11 +325,14 @@
       const userDoc = await getDoc(doc(db, 'users', currentUser));
       const role = userDoc.data().role;
 
-      if (role !== 'admin') return; // Sadece admin değiştirebilir
+      let targetUser;
+      if (role === 'admin') {
+        targetUser = document.getElementById('target-user').value;
+      } else {
+        targetUser = currentUser;
+      }
 
-      const targetUser = document.getElementById('target-user').value;
       const newPassword = document.getElementById('new-password').value;
-
       if (!newPassword) {
         alert('Yeni şifre giriniz!');
         return;
@@ -289,8 +341,14 @@
       try {
         const userRef = doc(db, 'users', targetUser);
         await updateDoc(userRef, { password: newPassword });
+
+        if (role === 'keeper' && !localStorage.getItem(`passwordChanged_${currentUser}`)) {
+          localStorage.setItem(`passwordChanged_${currentUser}`, 'true');
+        }
+
         alert('Şifre başarıyla değiştirildi!');
         document.getElementById('new-password').value = '';
+        setupChangeCredentials(role, currentUser); // Paneli güncelle
       } catch (error) {
         alert('Hata oluştu: ' + error.message);
       }
