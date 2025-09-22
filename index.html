@@ -105,6 +105,17 @@
       margin-left: 5px;
       color: green;
     }
+    .time-slot {
+      margin: 5px;
+      cursor: pointer;
+      padding: 5px 10px;
+      border: 1px solid #ff6666;
+      border-radius: 5px;
+    }
+    .time-slot.active {
+      background-color: #ff3333;
+      color: white;
+    }
   </style>
 </head>
 <body>
@@ -133,13 +144,20 @@
         <li class="nav-item" id="historyTab" style="display:none;">
           <a class="nav-link" href="#" onclick="switchTab('history')">Geçmiş Raporlar</a>
         </li>
+        <li class="nav-item" id="summaryTab" style="display:none;">
+          <a class="nav-link" href="#" onclick="switchTab('summary')">Toplam Değerler</a>
+        </li>
       </ul>
       <div class="tab-content mt-3">
+        <div id="time-slots" class="mb-3" style="display:none;"></div>
         <div id="currentTab" class="tab-content active">
           <div id="dashboard-content"></div>
         </div>
         <div id="historyTabContent" class="tab-content">
           <div id="history-content"></div>
+        </div>
+        <div id="summaryTabContent" class="tab-content">
+          <div id="summary-content"></div>
         </div>
       </div>
       <div id="change-credentials" style="display:none;" class="card p-4 mx-auto" style="max-width: 400px;">
@@ -200,6 +218,8 @@
           document.getElementById('dashboard').style.display = 'block';
           if (userDoc.data().role === 'admin') {
             document.getElementById('historyTab').style.display = 'block';
+            document.getElementById('summaryTab').style.display = 'block';
+            loadTimeSlots();
           }
         } else {
           alert('Geçersiz kullanıcı adı veya şifre!');
@@ -236,6 +256,8 @@
         setupChangeCredentials(role, username);
         if (role === 'admin') {
           document.getElementById('historyTab').style.display = 'block';
+          document.getElementById('summaryTab').style.display = 'block';
+          loadTimeSlots();
         }
       } else {
         document.getElementById('login-form').style.display = 'block';
@@ -257,7 +279,7 @@
           const oldReportRef = doc(db, 'daily_reports', lastLoadedDate);
           const oldReport = (await getDoc(oldReportRef)).data() || { coops: {} };
           if (Object.keys(oldReport.coops).length > 0) {
-            await setDoc(oldReportRef, oldReport); // Eski raporu sakla
+            await setDoc(oldReportRef, oldReport);
           }
           // 7 günden eski raporları sil
           const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0,10);
@@ -365,7 +387,7 @@
               box.classList.toggle('checked');
             };
           });
-        }, 1000); // Gecikme süresini 1 saniyeye uzattık
+        }, 1000);
       }
     }
 
@@ -533,7 +555,7 @@
       `;
     }
 
-    function getAdminTable(coopsData) {
+    function getAdminTable(coopsData, selectedSlot = 0) {
       let table = '<table class="table table-striped table-bordered"><thead><tr><th>Veri Türü</th>';
       coops.forEach(c => table += `<th>${c}</th>`);
       table += '</tr></thead><tbody>';
@@ -549,7 +571,7 @@
       table += getTableRow('Su Tüketimi (Litre)', coopsData, 'water_consumption');
       table += getTableRow('Min Sıcaklık', coopsData, 'temp_min');
       table += getTableRow('Max Sıcaklık', coopsData, 'temp_max');
-      table += getTableRow('Toplam Yer Yumurtası', coopsData, 'floor_eggs', true);
+      table += getTableRow('Yer Yumurtası', coopsData, 'floor_eggs', false, (v) => v[selectedSlot] || 0);
       table += getTableRow('Dişi Yemi Kontrol', coopsData, 'feed_check', false, (v) => v ? 'Evet' : 'Hayır');
       table += getTableRow('Suluk Kontrol', coopsData, 'water_check', false, (v) => v ? 'Evet' : 'Hayır');
       table += '</tbody></table>';
@@ -567,12 +589,45 @@
       return row;
     }
 
+    function getSummaryTable(coopsData) {
+      let table = '<table class="table table-striped table-bordered"><thead><tr><th>Kümes</th><th>Toplam Yumurta</th><th>Toplam Ölü Tavuk</th><th>Toplam Ölü Horoz</th></tr></thead><tbody>';
+      coops.forEach(c => {
+        const eggs = coopsData[c].floor_eggs.reduce((a,b)=>a+b,0) +
+                     coopsData[c].tray_right_front + coopsData[c].tray_right_back +
+                     coopsData[c].tray_left_front + coopsData[c].tray_left_back;
+        const deadChickens = coopsData[c].dead_chicken_left + coopsData[c].dead_chicken_right;
+        const deadRoosters = coopsData[c].dead_rooster_left + coopsData[c].dead_rooster_right;
+        table += `<tr><td>${c}</td><td>${eggs}</td><td>${deadChickens}</td><td>${deadRoosters}</td></tr>`;
+      });
+      table += '</tbody></table>';
+      return table;
+    }
+
     function switchTab(tab) {
       document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
       document.getElementById(`${tab}Tab`).classList.add('active');
       if (tab === 'history') {
         loadHistory();
+      } else if (tab === 'summary') {
+        loadSummary();
       }
+    }
+
+    function loadTimeSlots() {
+      const timeSlotsDiv = document.getElementById('time-slots');
+      timeSlotsDiv.style.display = 'flex';
+      timeSlotsDiv.innerHTML = timeSlots.map(t => `<span class="time-slot ${t === '08:00' ? 'active' : ''}" onclick="selectTimeSlot('${t}')">${t}</span>`).join('');
+      selectTimeSlot('08:00');
+    }
+
+    async function selectTimeSlot(time) {
+      const today = new Date().toISOString().slice(0,10);
+      const reportRef = doc(db, 'daily_reports', today);
+      const report = (await getDoc(reportRef)).data() || { coops: {} };
+      document.querySelectorAll('.time-slot').forEach(t => t.classList.remove('active'));
+      document.querySelector(`.time-slot:contains('${time}')`).classList.add('active');
+      const slotIndex = timeSlots.indexOf(time);
+      document.getElementById('dashboard-content').innerHTML = getAdminTable(report.coops, slotIndex);
     }
 
     async function loadHistory() {
@@ -594,6 +649,13 @@
       if (report) {
         document.getElementById('history-content').innerHTML = getAdminTable(report.coops) + '<button onclick="switchTab(\'history\')" class="btn btn-secondary w-100 mt-3 py-2"><i class="fas fa-arrow-left"></i> Geri</button>';
       }
+    }
+
+    async function loadSummary() {
+      const today = new Date().toISOString().slice(0,10);
+      const reportRef = doc(db, 'daily_reports', today);
+      const report = (await getDoc(reportRef)).data() || { coops: {} };
+      document.getElementById('summary-content').innerHTML = getSummaryTable(report.coops);
     }
   </script>
 </body>
