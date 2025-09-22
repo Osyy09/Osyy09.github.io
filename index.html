@@ -57,6 +57,22 @@
     .btn-danger:hover {
       background-color: #ff1a1a;
     }
+    .btn-info {
+      background-color: #17a2b8;
+      border: none;
+      transition: background-color 0.3s ease;
+    }
+    .btn-info:hover {
+      background-color: #138496;
+    }
+    .btn-secondary {
+      background-color: #6c757d;
+      border: none;
+      transition: background-color 0.3s ease;
+    }
+    .btn-secondary:hover {
+      background-color: #5a6268;
+    }
     .form-control {
       border-radius: 10px;
       border-color: #ff6666;
@@ -148,10 +164,13 @@
           <a class="nav-link" href="#" onclick="switchTab('summary')">Toplam Değerler</a>
         </li>
       </ul>
+      <div id="time-slots" class="mb-3" style="display:none;"></div>
       <div class="tab-content mt-3">
-        <div id="time-slots" class="mb-3" style="display:none;"></div>
         <div id="currentTab" class="tab-content active">
           <div id="dashboard-content"></div>
+          <div id="refresh-button" style="display:none;" class="mt-3">
+            <button onclick="refreshData()" class="btn btn-info w-100 py-2"><i class="fas fa-sync"></i> Verileri Yenile</button>
+          </div>
         </div>
         <div id="historyTabContent" class="tab-content">
           <div id="history-content"></div>
@@ -219,6 +238,8 @@
           if (userDoc.data().role === 'admin') {
             document.getElementById('historyTab').style.display = 'block';
             document.getElementById('summaryTab').style.display = 'block';
+            document.getElementById('time-slots').style.display = 'flex';
+            document.getElementById('refresh-button').style.display = 'block';
             loadTimeSlots();
           }
         } else {
@@ -257,6 +278,8 @@
         if (role === 'admin') {
           document.getElementById('historyTab').style.display = 'block';
           document.getElementById('summaryTab').style.display = 'block';
+          document.getElementById('time-slots').style.display = 'flex';
+          document.getElementById('refresh-button').style.display = 'block';
           loadTimeSlots();
         }
       } else {
@@ -269,19 +292,17 @@
     async function loadDashboard(role, coop, side) {
       const today = new Date().toISOString().slice(0,10);
       let reportRef = doc(db, 'daily_reports', today);
-      let report = (await getDoc(reportRef)).data() || {};
+      let report = (await getDoc(reportRef, { source: 'server' })).data() || {};
       if (!report.coops) report.coops = {};
 
-      // Yeni gün kontrolü ve sıfırlama
       const lastLoadedDate = localStorage.getItem('lastLoadedDate');
       if (!lastLoadedDate || lastLoadedDate !== today) {
         if (lastLoadedDate) {
           const oldReportRef = doc(db, 'daily_reports', lastLoadedDate);
-          const oldReport = (await getDoc(oldReportRef)).data() || { coops: {} };
+          const oldReport = (await getDoc(oldReportRef, { source: 'server' })).data() || { coops: {} };
           if (Object.keys(oldReport.coops).length > 0) {
             await setDoc(oldReportRef, oldReport);
           }
-          // 7 günden eski raporları sil
           const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0,10);
           const oldReportsQuery = query(collection(db, 'daily_reports'), where('timestamp', '<', sevenDaysAgo));
           const oldReportsSnapshot = await getDocs(oldReportsQuery);
@@ -289,7 +310,6 @@
             await deleteDoc(doc(db, 'daily_reports', docSnap.id));
           });
         }
-        // Yeni günü sıfırla
         report.coops = {};
         coops.forEach(c => {
           report.coops[c] = {
@@ -365,7 +385,7 @@
                   const coopDoc = await getDoc(coopRef);
                   const lastMeter = coopDoc.exists() ? coopDoc.data().last_meter : 0;
                   data.water_consumption = currentMeter - lastMeter;
-                  await setDoc(coopRef, {last_meter: currentMeter});
+                  await setDoc(coopRef, { last_meter: currentMeter });
                 }
                 data.feed_check = feedCheck;
                 data.water_check = waterCheck;
@@ -381,7 +401,6 @@
             };
           });
 
-          // Kontrol kutuları için tıklama eventleri
           document.querySelectorAll('.check-box').forEach(box => {
             box.onclick = () => {
               box.classList.toggle('checked');
@@ -605,7 +624,7 @@
 
     function switchTab(tab) {
       document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-      document.getElementById(`${tab}Tab`).classList.add('active');
+      document.getElementById(`${tab}TabContent`).classList.add('active');
       if (tab === 'history') {
         loadHistory();
       } else if (tab === 'summary') {
@@ -615,15 +634,15 @@
 
     function loadTimeSlots() {
       const timeSlotsDiv = document.getElementById('time-slots');
-      timeSlotsDiv.style.display = 'flex';
       timeSlotsDiv.innerHTML = timeSlots.map(t => `<span class="time-slot ${t === '08:00' ? 'active' : ''}" onclick="selectTimeSlot('${t}')">${t}</span>`).join('');
-      selectTimeSlot('08:00');
     }
 
     async function selectTimeSlot(time) {
+      const role = (await getDoc(doc(db, 'users', localStorage.getItem('currentUser')))).data().role;
+      if (role !== 'admin') return; // Sadece admin için saat filtresi aktif
       const today = new Date().toISOString().slice(0,10);
       const reportRef = doc(db, 'daily_reports', today);
-      const report = (await getDoc(reportRef)).data() || { coops: {} };
+      const report = (await getDoc(reportRef, { source: 'server' })).data() || { coops: {} };
       document.querySelectorAll('.time-slot').forEach(t => t.classList.remove('active'));
       document.querySelector(`.time-slot:contains('${time}')`).classList.add('active');
       const slotIndex = timeSlots.indexOf(time);
@@ -645,17 +664,25 @@
 
     async function showReport(date) {
       const reportRef = doc(db, 'daily_reports', date);
-      const report = (await getDoc(reportRef)).data();
+      const report = (await getDoc(reportRef, { source: 'server' })).data();
       if (report) {
-        document.getElementById('history-content').innerHTML = getAdminTable(report.coops) + '<button onclick="switchTab(\'history\')" class="btn btn-secondary w-100 mt-3 py-2"><i class="fas fa-arrow-left"></i> Geri</button>';
+        document.getElementById('history-content').innerHTML = getAdminTable(report.coops) + '<button onclick="switchTab(\'current\')" class="btn btn-secondary w-100 mt-3 py-2"><i class="fas fa-arrow-left"></i> Geri</button>';
       }
     }
 
     async function loadSummary() {
       const today = new Date().toISOString().slice(0,10);
       const reportRef = doc(db, 'daily_reports', today);
-      const report = (await getDoc(reportRef)).data() || { coops: {} };
+      const report = (await getDoc(reportRef, { source: 'server' })).data() || { coops: {} };
       document.getElementById('summary-content').innerHTML = getSummaryTable(report.coops);
+    }
+
+    async function refreshData() {
+      const role = (await getDoc(doc(db, 'users', localStorage.getItem('currentUser')))).data().role;
+      const coop = (await getDoc(doc(db, 'users', localStorage.getItem('currentUser')))).data().coop;
+      const side = (await getDoc(doc(db, 'users', localStorage.getItem('currentUser')))).data().side;
+      await loadDashboard(role, coop, side);
+      alert('Veriler yenilendi!');
     }
   </script>
 </body>
