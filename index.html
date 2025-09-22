@@ -94,6 +94,24 @@
     #dashboard, #login-form {
       animation: fadeIn 0.5s ease-in;
     }
+    .check-box {
+      margin: 5px 0;
+      cursor: pointer;
+    }
+    .checked::after {
+      content: '\f00c';
+      font-family: "Font Awesome 6 Free";
+      font-weight: 900;
+      margin-left: 5px;
+      color: green;
+    }
+    .nav-tabs .nav-link {
+      color: #cc0000;
+    }
+    .nav-tabs .nav-link.active {
+      background-color: #ff3333;
+      color: white;
+    }
   </style>
 </head>
 <body>
@@ -225,6 +243,8 @@
           temp_min: 99,
           temp_max: -99,
           floor_eggs: [0,0,0,0,0],
+          feed_check: false,
+          water_check: false,
           timestamp: today
         };
       });
@@ -243,11 +263,10 @@
         const myCoops = side === '1-5' ? side15 : side69;
         html = myCoops.map(c => getDutyForm(c, report.coops[c])).join('');
       } else if (role === 'admin') {
-        html = getAdminTable(report.coops) + '<button onclick="window.print()" class="btn btn-success w-100 mt-3 py-2"><i class="fas fa-print"></i> Yazdır</button>';
+        html = getAdminTabs(report.coops);
       }
       document.getElementById('dashboard-content').innerHTML = html;
 
-      // Buton event listener'larını yeniden ekle (hata yakalama ile)
       if (role !== 'admin') {
         setTimeout(() => {
           const buttons = document.querySelectorAll('.save-btn');
@@ -264,6 +283,10 @@
                 const addDeadRR = parseInt(document.getElementById(`add-dead-rr-${c}`)?.value || 0);
                 const currentTemp = parseFloat(document.getElementById(`temp-${c}`)?.value || 0);
                 const floor = parseInt(document.getElementById(`floor-${c}`)?.value || 0);
+                const feedCheckElement = document.getElementById(`feed-check-${c}`);
+                const waterCheckElement = document.getElementById(`water-check-${c}`);
+                const feedCheck = feedCheckElement ? feedCheckElement.classList.contains('checked') : false;
+                const waterCheck = waterCheckElement ? waterCheckElement.classList.contains('checked') : false;
 
                 let data = report.coops[c];
                 data.dead_chicken_left += addDeadCL;
@@ -286,18 +309,26 @@
                   data.water_consumption = currentMeter - lastMeter;
                   await setDoc(coopRef, {last_meter: currentMeter});
                 }
+                data.feed_check = feedCheck;
+                data.water_check = waterCheck;
 
                 report.coops[c] = data;
                 await setDoc(reportRef, report);
                 alert('Veriler kaydedildi!');
-                await loadDashboard(role, coop, side);  // Yenile
+                await loadDashboard(role, coop, side);
               } catch (error) {
                 console.error('Save error:', error);
                 alert('Kaydetme hatası: ' + error.message);
               }
             };
           });
-        }, 500);  // Kısa gecikme ile butonlar yüklensin
+
+          document.querySelectorAll('.check-box').forEach(box => {
+            box.onclick = () => {
+              box.classList.toggle('checked');
+            };
+          });
+        }, 500);
       }
     }
 
@@ -359,7 +390,7 @@
 
         alert('Şifre başarıyla değiştirildi!');
         document.getElementById('new-password').value = '';
-        setupChangeCredentials(role, currentUser); // Paneli güncelle
+        setupChangeCredentials(role, currentUser);
       } catch (error) {
         alert('Hata oluştu: ' + error.message);
       }
@@ -419,6 +450,8 @@
             <label for="meter-${coop}" class="form-label">Su Sayaç Okuması:</label>
             <input type="number" id="meter-${coop}" class="form-control">
           </div>
+          <div class="check-box ${data.feed_check ? 'checked' : ''}" id="feed-check-${coop}">Dişi yemi kontrolü yapıldı</div>
+          <div class="check-box ${data.water_check ? 'checked' : ''}" id="water-check-${coop}">Suluk kontrolü yapıldı</div>
           <button class="btn btn-primary w-100 py-2 save-btn" data-coop="${coop}"><i class="fas fa-save"></i> Kaydet</button>
         </div>
       `;
@@ -458,41 +491,74 @@
             <label for="floor-${coop}" class="form-label">Yer Yumurtası Sayısı:</label>
             <input type="number" id="floor-${coop}" class="form-control" value="0">
           </div>
+          <div class="check-box ${data.feed_check ? 'checked' : ''}" id="feed-check-${coop}">Dişi yemi kontrolü yapıldı</div>
+          <div class="check-box ${data.water_check ? 'checked' : ''}" id="water-check-${coop}">Suluk kontrolü yapıldı</div>
           <button class="btn btn-primary w-100 py-2 save-btn" data-coop="${coop}"><i class="fas fa-save"></i> Kaydet</button>
         </div>
       `;
     }
 
-    function getAdminTable(coopsData) {
-      let table = '<table class="table table-striped table-bordered"><thead><tr><th>Veri Türü</th>';
-      coops.forEach(c => table += `<th>${c}</th>`);
-      table += '</tr></thead><tbody>';
-      table += getTableRow('Tarih', coopsData, 'timestamp');
-      table += getTableRow('Ölü Tavuk Sol', coopsData, 'dead_chicken_left');
-      table += getTableRow('Ölü Tavuk Sağ', coopsData, 'dead_chicken_right');
-      table += getTableRow('Ölü Horoz Sol', coopsData, 'dead_rooster_left');
-      table += getTableRow('Ölü Horoz Sağ', coopsData, 'dead_rooster_right');
-      table += getTableRow('Sağ Ön Dolu Tabak', coopsData, 'tray_right_front');
-      table += getTableRow('Sağ Arka Dolu Tabak', coopsData, 'tray_right_back');
-      table += getTableRow('Sol Ön Dolu Tabak', coopsData, 'tray_left_front');
-      table += getTableRow('Sol Arka Dolu Tabak', coopsData, 'tray_left_back');
-      table += getTableRow('Su Tüketimi (Litre)', coopsData, 'water_consumption');
-      table += getTableRow('Min Sıcaklık', coopsData, 'temp_min');
-      table += getTableRow('Max Sıcaklık', coopsData, 'temp_max');
-      table += getTableRow('Toplam Yer Yumurtası', coopsData, 'floor_eggs', true);
-      table += '</tbody></table>';
-      return table;
+    function getAdminTabs(coopsData) {
+      let tabs = '<ul class="nav nav-tabs" id="coopTabs">';
+      coops.forEach(c => tabs += `<li class="nav-item"><a class="nav-link ${c === '1A' ? 'active' : ''}" href="#" onclick="switchCoopTab('${c}')">${c}</a></li>`);
+      tabs += '</ul><div class="tab-content mt-3">';
+      coops.forEach(c => {
+        tabs += `
+          <div id="tab-${c}" class="tab-pane ${c === '1A' ? 'active' : ''}">
+            <div class="card p-4 mb-3">
+              <h3>${c} Kümes Verileri - Tarih: ${coopsData[c].timestamp}</h3>
+              <table class="table table-striped table-bordered">
+                <tbody>
+                  ${getTableRow('Ölü Tavuk Sol', coopsData, 'dead_chicken_left', c)}
+                  ${getTableRow('Ölü Tavuk Sağ', coopsData, 'dead_chicken_right', c)}
+                  ${getTableRow('Ölü Horoz Sol', coopsData, 'dead_rooster_left', c)}
+                  ${getTableRow('Ölü Horoz Sağ', coopsData, 'dead_rooster_right', c)}
+                  ${getTableRow('Sağ Ön Dolu Tabak', coopsData, 'tray_right_front', c)}
+                  ${getTableRow('Sağ Arka Dolu Tabak', coopsData, 'tray_right_back', c)}
+                  ${getTableRow('Sol Ön Dolu Tabak', coopsData, 'tray_left_front', c)}
+                  ${getTableRow('Sol Arka Dolu Tabak', coopsData, 'tray_left_back', c)}
+                  ${getTableRow('Su Tüketimi (Litre)', coopsData, 'water_consumption', c)}
+                  ${getTableRow('Min Sıcaklık', coopsData, 'temp_min', c)}
+                  ${getTableRow('Max Sıcaklık', coopsData, 'temp_max', c)}
+                  ${getTableRow('Toplam Yer Yumurtası', coopsData, 'floor_eggs', c, true)}
+                  ${getTableRow('Dişi Yemi Kontrol', coopsData, 'feed_check', c)}
+                  ${getTableRow('Suluk Kontrol', coopsData, 'water_check', c)}
+                  ${getTotalRow(c, coopsData[c])}
+                </tbody>
+              </table>
+              <button onclick="window.print()" class="btn btn-success w-100 mt-3 py-2"><i class="fas fa-print"></i> Yazdır</button>
+            </div>
+          </div>
+        `;
+      });
+      tabs += '</div>';
+      return tabs;
     }
 
-    function getTableRow(label, data, key, sum=false) {
-      let row = `<tr><td>${label}</td>`;
-      coops.forEach(c => {
-        let val = data[c][key];
-        if (sum) val = val.reduce((a,b)=>a+b,0);
-        row += `<td>${val}</td>`;
-      });
-      row += '</tr>';
-      return row;
+    function getTableRow(label, data, key, coop, sum=false) {
+      let val = data[coop][key];
+      if (sum) val = val.reduce((a,b)=>a+b,0);
+      return `<tr><td>${label}</td><td>${val !== undefined ? val : 'N/A'}</td></tr>`;
+    }
+
+    function getTotalRow(coop, data) {
+      const totalChickens = data.dead_chicken_left + data.dead_chicken_right;
+      const totalRoosters = data.dead_rooster_left + data.dead_rooster_right;
+      const totalEggs = data.floor_eggs.reduce((a,b)=>a+b,0) +
+                       data.tray_right_front + data.tray_right_back +
+                       data.tray_left_front + data.tray_left_back;
+      return `
+        <tr><td>Toplam Ölü Tavuk</td><td>${totalChickens}</td></tr>
+        <tr><td>Toplam Ölü Horoz</td><td>${totalRoosters}</td></tr>
+        <tr><td>Toplam Yumurta Sayısı</td><td>${totalEggs}</td></tr>
+      `;
+    }
+
+    function switchCoopTab(coop) {
+      document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+      document.querySelector(`.nav-link:contains('${coop}')`).classList.add('active');
+      document.getElementById(`tab-${coop}`).classList.add('active');
     }
   </script>
 </body>
