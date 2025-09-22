@@ -247,46 +247,57 @@
       }
       document.getElementById('dashboard-content').innerHTML = html;
 
+      // Buton event listener'larını yeniden ekle (hata yakalama ile)
       if (role !== 'admin') {
-        document.querySelectorAll('.save-btn').forEach(btn => {
-          btn.onclick = async () => {
-            const c = btn.dataset.coop;
-            const slot = timeSlots.indexOf(document.getElementById(`slot-${c}`).value);
-            const addDeadCL = parseInt(document.getElementById(`add-dead-cl-${c}`).value || 0);
-            const addDeadCR = parseInt(document.getElementById(`add-dead-cr-${c}`).value || 0);
-            const addDeadRL = parseInt(document.getElementById(`add-dead-rl-${c}`).value || 0);
-            const addDeadRR = parseInt(document.getElementById(`add-dead-rr-${c}`).value || 0);
-            const currentTemp = parseFloat(document.getElementById(`temp-${c}`).value || 0);
-            const floor = parseInt(document.getElementById(`floor-${c}`).value || 0);
+        setTimeout(() => {
+          const buttons = document.querySelectorAll('.save-btn');
+          buttons.forEach(btn => {
+            btn.onclick = async (e) => {
+              try {
+                e.preventDefault();
+                const c = btn.dataset.coop;
+                const slotElement = document.getElementById(`slot-${c}`);
+                const slot = timeSlots.indexOf(slotElement ? slotElement.value : '08:00');
+                const addDeadCL = parseInt(document.getElementById(`add-dead-cl-${c}`)?.value || 0);
+                const addDeadCR = parseInt(document.getElementById(`add-dead-cr-${c}`)?.value || 0);
+                const addDeadRL = parseInt(document.getElementById(`add-dead-rl-${c}`)?.value || 0);
+                const addDeadRR = parseInt(document.getElementById(`add-dead-rr-${c}`)?.value || 0);
+                const currentTemp = parseFloat(document.getElementById(`temp-${c}`)?.value || 0);
+                const floor = parseInt(document.getElementById(`floor-${c}`)?.value || 0);
 
-            let data = report.coops[c];
-            data.dead_chicken_left += addDeadCL;
-            data.dead_chicken_right += addDeadCR;
-            data.dead_rooster_left += addDeadRL;
-            data.dead_rooster_right += addDeadRR;
-            data.floor_eggs[slot] = floor;
-            if (currentTemp < data.temp_min && currentTemp > 0) data.temp_min = currentTemp;
-            if (currentTemp > data.temp_max) data.temp_max = currentTemp;
+                let data = report.coops[c];
+                data.dead_chicken_left += addDeadCL;
+                data.dead_chicken_right += addDeadCR;
+                data.dead_rooster_left += addDeadRL;
+                data.dead_rooster_right += addDeadRR;
+                data.floor_eggs[slot] = floor;
+                if (currentTemp < data.temp_min && currentTemp > 0) data.temp_min = currentTemp;
+                if (currentTemp > data.temp_max) data.temp_max = currentTemp;
 
-            if (role === 'keeper') {
-              data.tray_right_front = parseInt(document.getElementById(`tray-rf-${c}`).value || 0);
-              data.tray_right_back = parseInt(document.getElementById(`tray-rb-${c}`).value || 0);
-              data.tray_left_front = parseInt(document.getElementById(`tray-lf-${c}`).value || 0);
-              data.tray_left_back = parseInt(document.getElementById(`tray-lb-${c}`).value || 0);
-              const currentMeter = parseInt(document.getElementById(`meter-${c}`).value || 0);
-              const coopRef = doc(db, 'coops', c);
-              const coopDoc = await getDoc(coopRef);
-              const lastMeter = coopDoc.exists() ? coopDoc.data().last_meter : 0;
-              data.water_consumption = currentMeter - lastMeter;
-              await setDoc(coopRef, {last_meter: currentMeter});
-            }
+                if (role === 'keeper') {
+                  data.tray_right_front = parseInt(document.getElementById(`tray-rf-${c}`)?.value || 0);
+                  data.tray_right_back = parseInt(document.getElementById(`tray-rb-${c}`)?.value || 0);
+                  data.tray_left_front = parseInt(document.getElementById(`tray-lf-${c}`)?.value || 0);
+                  data.tray_left_back = parseInt(document.getElementById(`tray-lb-${c}`)?.value || 0);
+                  const currentMeter = parseInt(document.getElementById(`meter-${c}`)?.value || 0);
+                  const coopRef = doc(db, 'coops', c);
+                  const coopDoc = await getDoc(coopRef);
+                  const lastMeter = coopDoc.exists() ? coopDoc.data().last_meter : 0;
+                  data.water_consumption = currentMeter - lastMeter;
+                  await setDoc(coopRef, {last_meter: currentMeter});
+                }
 
-            report.coops[c] = data;
-            await setDoc(reportRef, report);
-            alert('Veriler kaydedildi!');
-            loadDashboard(role, coop, side);
-          };
-        });
+                report.coops[c] = data;
+                await setDoc(reportRef, report);
+                alert('Veriler kaydedildi!');
+                await loadDashboard(role, coop, side);  // Yenile
+              } catch (error) {
+                console.error('Save error:', error);
+                alert('Kaydetme hatası: ' + error.message);
+              }
+            };
+          });
+        }, 500);  // Kısa gecikme ile butonlar yüklensin
       }
     }
 
