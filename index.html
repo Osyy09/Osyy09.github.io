@@ -239,7 +239,7 @@
           tray_right_back: 0,
           tray_left_front: 0,
           tray_left_back: 0,
-          water_consumption: 0, // Manuel girilen tüketim
+          water_consumption: 0,
           temp_min: 99,
           temp_max: -99,
           floor_eggs: [0,0,0,0,0],
@@ -325,6 +325,15 @@
             };
           });
         }, 500);
+      } else {
+        // Sekme butonlarına event listener ekle
+        document.querySelectorAll('.nav-link').forEach(link => {
+          link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const coop = link.textContent.trim();
+            switchCoopTab(coop);
+          });
+        });
       }
     }
 
@@ -500,7 +509,7 @@
 
     function getAdminTabs(coopsData) {
       let tabs = '<ul class="nav nav-tabs" id="coopTabs">';
-      coops.forEach(c => tabs += `<li class="nav-item"><a class="nav-link ${c === '1A' ? 'active' : ''}" href="#" onclick="switchCoopTab('${c}')">${c}</a></li>`);
+      coops.forEach(c => tabs += `<li class="nav-item"><a class="nav-link ${c === '1A' ? 'active' : ''}" href="#" data-coop="${c}">${c}</a></li>`);
       tabs += '</ul><div class="tab-content mt-3">';
       coops.forEach(c => {
         tabs += `
@@ -555,9 +564,11 @@
     }
 
     function switchCoopTab(coop) {
-      document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+      document.querySelectorAll('.nav-link').forEach(link => {
+        link.classList.remove('active');
+        if (link.getAttribute('data-coop') === coop) link.classList.add('active');
+      });
       document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
-      document.querySelector(`.nav-link:contains('${coop}')`).classList.add('active');
       document.getElementById(`tab-${coop}`).classList.add('active');
     }
   </script>
