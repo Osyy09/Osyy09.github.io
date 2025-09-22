@@ -57,6 +57,14 @@
     .btn-danger:hover {
       background-color: #ff1a1a;
     }
+    .btn-info {
+      background-color: #17a2b8;
+      border: none;
+      transition: background-color 0.3s ease;
+    }
+    .btn-info:hover {
+      background-color: #138496;
+    }
     .form-control {
       border-radius: 10px;
       border-color: #ff6666;
@@ -94,6 +102,19 @@
     #dashboard, #login-form {
       animation: fadeIn 0.5s ease-in;
     }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    .nav-tabs .nav-link {
+      color: #cc0000;
+    }
+    .nav-tabs .nav-link.active {
+      background-color: #ff3333;
+      color: #ffffff;
+    }
   </style>
 </head>
 <body>
@@ -115,7 +136,22 @@
       <button onclick="login()" class="btn btn-primary w-100 py-2"><i class="fas fa-sign-in-alt"></i> Giriş</button>
     </div>
     <div id="dashboard" style="display:none;" class="mt-4">
-      <div id="dashboard-content"></div>
+      <ul class="nav nav-tabs" id="dashboardTabs">
+        <li class="nav-item">
+          <a class="nav-link active" href="#" onclick="switchTab('current')">Güncel Rapor</a>
+        </li>
+        <li class="nav-item" id="historyTab" style="display:none;">
+          <a class="nav-link" href="#" onclick="switchTab('history')">Geçmiş Raporlar</a>
+        </li>
+      </ul>
+      <div class="tab-content mt-3">
+        <div id="currentTab" class="tab-content active">
+          <div id="dashboard-content"></div>
+        </div>
+        <div id="historyTabContent" class="tab-content">
+          <div id="history-content"></div>
+        </div>
+      </div>
       <div id="change-credentials" style="display:none;" class="card p-4 mx-auto" style="max-width: 400px;">
         <h3 class="mb-3">Şifreyi Değiştir</h3>
         <div id="user-select" style="display:none;" class="mb-3">
@@ -134,7 +170,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js";
     import { getAuth, signInAnonymously, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-auth.js";
-    import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, query, where, getDocs, collection } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-firestore.js";
+    import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, query, where, getDocs, collection, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyCildgfGrsyzGkOC6ClKHji_HunnJC3r2k",
@@ -166,6 +202,9 @@
           await loadDashboard(userDoc.data().role, userDoc.data().coop, userDoc.data().side);
           document.getElementById('login-form').style.display = 'none';
           document.getElementById('dashboard').style.display = 'block';
+          if (userDoc.data().role === 'admin') {
+            document.getElementById('historyTab').style.display = 'block';
+          }
         } else {
           alert('Geçersiz kullanıcı adı veya şifre!');
           auth.signOut();
@@ -199,6 +238,9 @@
         const side = userDoc.data().side;
         await loadDashboard(role, coop, side);
         setupChangeCredentials(role, username);
+        if (role === 'admin') {
+          document.getElementById('historyTab').style.display = 'block';
+        }
       } else {
         document.getElementById('login-form').style.display = 'block';
         document.getElementById('dashboard').style.display = 'none';
@@ -208,7 +250,7 @@
 
     async function loadDashboard(role, coop, side) {
       const today = new Date().toISOString().slice(0,10);
-      const reportRef = doc(db, 'daily_reports', today);
+      let reportRef = doc(db, 'daily_reports', today);
       let report = (await getDoc(reportRef)).data() || {};
       if (!report.coops) report.coops = {};
       coops.forEach(c => {
@@ -222,47 +264,47 @@
           tray_left_front: 0,
           tray_left_back: 0,
           water_consumption: 0,
-          temp_min: 99,
-          temp_max: -99,
+          temp_min: 0,
+          temp_max: 0,
           floor_eggs: [0,0,0,0,0],
           timestamp: today
         };
       });
 
-      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0,10);
-      const reportsQuery = query(collection(db, 'daily_reports'), where('timestamp', '<', sevenDaysAgo));
-      const querySnapshot = await getDocs(reportsQuery);
-      querySnapshot.forEach(async (docSnap) => {
-        await deleteDoc(doc(db, 'daily_reports', docSnap.id));
-      });
+      // Yeni gün için rapor sıfırlama
+      const lastLoadedDate = localStorage.getItem('lastLoadedDate');
+      if (!lastLoadedDate || lastLoadedDate !== today) {
+        await setDoc(reportRef, report, { merge: true });
+        localStorage.setItem('lastLoadedDate', today);
+      }
 
       let html = '';
       if (role === 'keeper') {
-        html = getKeeperForm(coop, report.coops[coop]);
+        html = getKeeperForm(coop, report.coops[coop], today);
       } else if (role === 'duty') {
         const myCoops = side === '1-5' ? side15 : side69;
-        html = myCoops.map(c => getDutyForm(c, report.coops[c])).join('');
+        html = myCoops.map(c => getDutyForm(c, report.coops[c], today)).join('');
       } else if (role === 'admin') {
         html = getAdminTable(report.coops) + '<button onclick="window.print()" class="btn btn-success w-100 mt-3 py-2"><i class="fas fa-print"></i> Yazdır</button>';
       }
       document.getElementById('dashboard-content').innerHTML = html;
 
-      // Buton event listener'larını yeniden ekle (hata yakalama ile)
       if (role !== 'admin') {
         setTimeout(() => {
-          const buttons = document.querySelectorAll('.save-btn');
+          const buttons = document.querySelectorAll('.save-btn, .edit-btn');
           buttons.forEach(btn => {
             btn.onclick = async (e) => {
               try {
                 e.preventDefault();
                 const c = btn.dataset.coop;
+                const isEdit = btn.classList.contains('edit-btn');
                 const slotElement = document.getElementById(`slot-${c}`);
                 const slot = timeSlots.indexOf(slotElement ? slotElement.value : '08:00');
                 const addDeadCL = parseInt(document.getElementById(`add-dead-cl-${c}`)?.value || 0);
                 const addDeadCR = parseInt(document.getElementById(`add-dead-cr-${c}`)?.value || 0);
                 const addDeadRL = parseInt(document.getElementById(`add-dead-rl-${c}`)?.value || 0);
                 const addDeadRR = parseInt(document.getElementById(`add-dead-rr-${c}`)?.value || 0);
-                const currentTemp = parseFloat(document.getElementById(`temp-${c}`)?.value || 0);
+                const currentTemp = parseFloat(document.getElementById(`temp-${c}`)?.value || NaN);
                 const floor = parseInt(document.getElementById(`floor-${c}`)?.value || 0);
 
                 let data = report.coops[c];
@@ -271,8 +313,10 @@
                 data.dead_rooster_left += addDeadRL;
                 data.dead_rooster_right += addDeadRR;
                 data.floor_eggs[slot] = floor;
-                if (currentTemp < data.temp_min && currentTemp > 0) data.temp_min = currentTemp;
-                if (currentTemp > data.temp_max) data.temp_max = currentTemp;
+                if (!isNaN(currentTemp) && currentTemp > 0) {
+                  if (currentTemp < data.temp_min || data.temp_min === 0) data.temp_min = currentTemp;
+                  if (currentTemp > data.temp_max) data.temp_max = currentTemp;
+                }
 
                 if (role === 'keeper') {
                   data.tray_right_front = parseInt(document.getElementById(`tray-rf-${c}`)?.value || 0);
@@ -284,20 +328,20 @@
                   const coopDoc = await getDoc(coopRef);
                   const lastMeter = coopDoc.exists() ? coopDoc.data().last_meter : 0;
                   data.water_consumption = currentMeter - lastMeter;
-                  await setDoc(coopRef, {last_meter: currentMeter});
+                  await setDoc(coopRef, {last_meter: currentMeter}, { merge: true });
                 }
 
                 report.coops[c] = data;
-                await setDoc(reportRef, report);
-                alert('Veriler kaydedildi!');
-                await loadDashboard(role, coop, side);  // Yenile
+                await setDoc(reportRef, report, { merge: true });
+                alert('Veriler ' + (isEdit ? 'düzenlendi' : 'kaydedildi') + '!');
+                await loadDashboard(role, coop, side);
               } catch (error) {
-                console.error('Save error:', error);
-                alert('Kaydetme hatası: ' + error.message);
+                console.error('Save/Edit error:', error);
+                alert('İşlem hatası: ' + error.message);
               }
             };
           });
-        }, 500);  // Kısa gecikme ile butonlar yüklensin
+        }, 500);
       }
     }
 
@@ -359,45 +403,45 @@
 
         alert('Şifre başarıyla değiştirildi!');
         document.getElementById('new-password').value = '';
-        setupChangeCredentials(role, currentUser); // Paneli güncelle
+        setupChangeCredentials(role, currentUser);
       } catch (error) {
         alert('Hata oluştu: ' + error.message);
       }
     };
 
-    function getKeeperForm(coop, data) {
+    function getKeeperForm(coop, data, today) {
       return `
         <div class="card p-4 mb-3">
           <h3>${coop} Kümes Verileri - Tarih: ${data.timestamp}</h3>
           <div class="mb-3">
             <label for="slot-${coop}" class="form-label">Giriş Saati:</label>
             <select id="slot-${coop}" class="form-control">
-              ${timeSlots.map(t => `<option>${t}</option>`).join('')}
+              ${timeSlots.map(t => `<option ${data.timestamp === today && data.floor_eggs[timeSlots.indexOf(t)] > 0 ? 'selected' : ''}>${t}</option>`).join('')}
             </select>
           </div>
           <div class="mb-3">
             <label for="add-dead-cl-${coop}" class="form-label">Ek Ölü Tavuk Sol:</label>
-            <input type="number" id="add-dead-cl-${coop}" class="form-control" value="0">
+            <input type="number" id="add-dead-cl-${coop}" class="form-control" value="${data.dead_chicken_left}">
           </div>
           <div class="mb-3">
             <label for="add-dead-cr-${coop}" class="form-label">Ek Ölü Tavuk Sağ:</label>
-            <input type="number" id="add-dead-cr-${coop}" class="form-control" value="0">
+            <input type="number" id="add-dead-cr-${coop}" class="form-control" value="${data.dead_chicken_right}">
           </div>
           <div class="mb-3">
             <label for="add-dead-rl-${coop}" class="form-label">Ek Ölü Horoz Sol:</label>
-            <input type="number" id="add-dead-rl-${coop}" class="form-control" value="0">
+            <input type="number" id="add-dead-rl-${coop}" class="form-control" value="${data.dead_rooster_left}">
           </div>
           <div class="mb-3">
             <label for="add-dead-rr-${coop}" class="form-label">Ek Ölü Horoz Sağ:</label>
-            <input type="number" id="add-dead-rr-${coop}" class="form-control" value="0">
+            <input type="number" id="add-dead-rr-${coop}" class="form-control" value="${data.dead_rooster_right}">
           </div>
           <div class="mb-3">
-            <label for="temp-${coop}" class="form-label">Geçerli Sıcaklık:</label>
-            <input type="number" id="temp-${coop}" class="form-control">
+            <label for="temp-${coop}" class="form-label">Geçerli Sıcaklık (°C):</label>
+            <input type="number" id="temp-${coop}" class="form-control" value="">
           </div>
           <div class="mb-3">
             <label for="floor-${coop}" class="form-label">Yer Yumurtası Sayısı:</label>
-            <input type="number" id="floor-${coop}" class="form-control" value="0">
+            <input type="number" id="floor-${coop}" class="form-control" value="${data.floor_eggs[timeSlots.indexOf(document.getElementById(`slot-${coop}`).value) || 0] || 0}">
           </div>
           <div class="mb-3">
             <label for="tray-rf-${coop}" class="form-label">Sağ Ön Dolu Tabak:</label>
@@ -417,48 +461,50 @@
           </div>
           <div class="mb-3">
             <label for="meter-${coop}" class="form-label">Su Sayaç Okuması:</label>
-            <input type="number" id="meter-${coop}" class="form-control">
+            <input type="number" id="meter-${coop}" class="form-control" value="">
           </div>
           <button class="btn btn-primary w-100 py-2 save-btn" data-coop="${coop}"><i class="fas fa-save"></i> Kaydet</button>
+          <button class="btn btn-info w-100 py-2 mt-2 edit-btn" data-coop="${coop}"><i class="fas fa-edit"></i> Düzenle</button>
         </div>
       `;
     }
 
-    function getDutyForm(coop, data) {
+    function getDutyForm(coop, data, today) {
       return `
         <div class="card p-4 mb-3">
           <h3>${coop} Kümes Verileri (Nöbetçi) - Tarih: ${data.timestamp}</h3>
           <div class="mb-3">
             <label for="slot-${coop}" class="form-label">Giriş Saati:</label>
             <select id="slot-${coop}" class="form-control">
-              ${timeSlots.map(t => `<option>${t}</option>`).join('')}
+              ${timeSlots.map(t => `<option ${data.timestamp === today && data.floor_eggs[timeSlots.indexOf(t)] > 0 ? 'selected' : ''}>${t}</option>`).join('')}
             </select>
           </div>
           <div class="mb-3">
             <label for="add-dead-cl-${coop}" class="form-label">Ek Ölü Tavuk Sol:</label>
-            <input type="number" id="add-dead-cl-${coop}" class="form-control" value="0">
+            <input type="number" id="add-dead-cl-${coop}" class="form-control" value="${data.dead_chicken_left}">
           </div>
           <div class="mb-3">
             <label for="add-dead-cr-${coop}" class="form-label">Ek Ölü Tavuk Sağ:</label>
-            <input type="number" id="add-dead-cr-${coop}" class="form-control" value="0">
+            <input type="number" id="add-dead-cr-${coop}" class="form-control" value="${data.dead_chicken_right}">
           </div>
           <div class="mb-3">
             <label for="add-dead-rl-${coop}" class="form-label">Ek Ölü Horoz Sol:</label>
-            <input type="number" id="add-dead-rl-${coop}" class="form-control" value="0">
+            <input type="number" id="add-dead-rl-${coop}" class="form-control" value="${data.dead_rooster_left}">
           </div>
           <div class="mb-3">
             <label for="add-dead-rr-${coop}" class="form-label">Ek Ölü Horoz Sağ:</label>
-            <input type="number" id="add-dead-rr-${coop}" class="form-control" value="0">
+            <input type="number" id="add-dead-rr-${coop}" class="form-control" value="${data.dead_rooster_right}">
           </div>
           <div class="mb-3">
-            <label for="temp-${coop}" class="form-label">Geçerli Sıcaklık:</label>
-            <input type="number" id="temp-${coop}" class="form-control">
+            <label for="temp-${coop}" class="form-label">Geçerli Sıcaklık (°C):</label>
+            <input type="number" id="temp-${coop}" class="form-control" value="">
           </div>
           <div class="mb-3">
             <label for="floor-${coop}" class="form-label">Yer Yumurtası Sayısı:</label>
-            <input type="number" id="floor-${coop}" class="form-control" value="0">
+            <input type="number" id="floor-${coop}" class="form-control" value="${data.floor_eggs[timeSlots.indexOf(document.getElementById(`slot-${coop}`).value) || 0] || 0}">
           </div>
           <button class="btn btn-primary w-100 py-2 save-btn" data-coop="${coop}"><i class="fas fa-save"></i> Kaydet</button>
+          <button class="btn btn-info w-100 py-2 mt-2 edit-btn" data-coop="${coop}"><i class="fas fa-edit"></i> Düzenle</button>
         </div>
       `;
     }
@@ -477,8 +523,8 @@
       table += getTableRow('Sol Ön Dolu Tabak', coopsData, 'tray_left_front');
       table += getTableRow('Sol Arka Dolu Tabak', coopsData, 'tray_left_back');
       table += getTableRow('Su Tüketimi (Litre)', coopsData, 'water_consumption');
-      table += getTableRow('Min Sıcaklık', coopsData, 'temp_min');
-      table += getTableRow('Max Sıcaklık', coopsData, 'temp_max');
+      table += getTableRow('Min Sıcaklık (°C)', coopsData, 'temp_min');
+      table += getTableRow('Max Sıcaklık (°C)', coopsData, 'temp_max');
       table += getTableRow('Toplam Yer Yumurtası', coopsData, 'floor_eggs', true);
       table += '</tbody></table>';
       return table;
@@ -489,10 +535,40 @@
       coops.forEach(c => {
         let val = data[c][key];
         if (sum) val = val.reduce((a,b)=>a+b,0);
-        row += `<td>${val}</td>`;
+        if (key === 'temp_min' || key === 'temp_max') val += ' ℃';
+        row += `<td>${val !== undefined ? val : 'N/A'}</td>`;
       });
       row += '</tr>';
       return row;
+    }
+
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      document.getElementById(`${tab}Tab`).classList.add('active');
+      if (tab === 'history') {
+        loadHistory();
+      }
+    }
+
+    async function loadHistory() {
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0,10);
+      const reportsQuery = query(collection(db, 'daily_reports'), where('timestamp', '>=', sevenDaysAgo), orderBy('timestamp', 'desc'));
+      const querySnapshot = await getDocs(reportsQuery);
+      let html = '<h3>Geçmiş Raporlar</h3><ul class="list-group">';
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        html += `<li class="list-group-item"><a href="#" onclick="showReport('${doc.id}')">${data.timestamp}</a></li>`;
+      });
+      html += '</ul>';
+      document.getElementById('history-content').innerHTML = html;
+    }
+
+    async function showReport(date) {
+      const reportRef = doc(db, 'daily_reports', date);
+      const report = (await getDoc(reportRef)).data();
+      if (report) {
+        document.getElementById('history-content').innerHTML = getAdminTable(report.coops) + '<button onclick="switchTab(\'history\')" class="btn btn-secondary w-100 mt-3 py-2"><i class="fas fa-arrow-left"></i> Geri</button>';
+      }
     }
   </script>
 </body>
