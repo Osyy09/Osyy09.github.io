@@ -57,14 +57,6 @@
     .btn-danger:hover {
       background-color: #ff1a1a;
     }
-    .btn-info {
-      background-color: #17a2b8;
-      border: none;
-      transition: background-color 0.3s ease;
-    }
-    .btn-info:hover {
-      background-color: #138496;
-    }
     .form-control {
       border-radius: 10px;
       border-color: #ff6666;
@@ -102,18 +94,16 @@
     #dashboard, #login-form {
       animation: fadeIn 0.5s ease-in;
     }
-    .tab-content {
-      display: none;
+    .check-box {
+      margin: 5px 0;
+      cursor: pointer;
     }
-    .tab-content.active {
-      display: block;
-    }
-    .nav-tabs .nav-link {
-      color: #cc0000;
-    }
-    .nav-tabs .nav-link.active {
-      background-color: #ff3333;
-      color: #ffffff;
+    .checked::after {
+      content: '\f00c';
+      font-family: "Font Awesome 6 Free";
+      font-weight: 900;
+      margin-left: 5px;
+      color: green;
     }
   </style>
 </head>
@@ -133,7 +123,7 @@
       <div class="mb-3">
         <input type="password" id="password" class="form-control mb-2" placeholder="Şifre">
       </div>
-      <button id="loginButton" class="btn btn-primary w-100 py-2"><i class="fas fa-sign-in-alt"></i> Giriş</button>
+      <button onclick="login()" class="btn btn-primary w-100 py-2"><i class="fas fa-sign-in-alt"></i> Giriş</button>
     </div>
     <div id="dashboard" style="display:none;" class="mt-4">
       <ul class="nav nav-tabs" id="dashboardTabs">
@@ -190,34 +180,16 @@
     const side69 = coops.slice(10);
     const timeSlots = ['08:00', '09:00', '10:15', '13:00', '14:15'];
 
-    document.addEventListener('DOMContentLoaded', () => {
-      const loginButton = document.getElementById('loginButton');
-      if (loginButton) {
-        loginButton.addEventListener('click', login);
-      } else {
-        console.error('Login button not found!');
-      }
-    });
-
     window.login = async () => {
+      const usernameInput = document.getElementById('username');
+      const passwordInput = document.getElementById('password');
+      if (!usernameInput || !passwordInput) {
+        alert('Kullanıcı adı veya şifre alanı bulunamadı!');
+        return;
+      }
+      const username = usernameInput.value;
+      const password = passwordInput.value;
       try {
-        const usernameInput = document.getElementById('username');
-        const passwordInput = document.getElementById('password');
-        console.log('Username Input:', usernameInput);
-        console.log('Password Input:', passwordInput);
-
-        if (!usernameInput || !passwordInput) {
-          alert('Kullanıcı adı veya şifre alanı bulunamadı!');
-          return;
-        }
-
-        const username = usernameInput.value.trim();
-        const password = passwordInput.value.trim();
-        if (!username || !password) {
-          alert('Kullanıcı adı ve şifre giriniz!');
-          return;
-        }
-
         const userCredential = await signInAnonymously(auth);
         const user = userCredential.user;
         const userDoc = await getDoc(doc(db, 'users', username));
@@ -234,7 +206,6 @@
           auth.signOut();
         }
       } catch (error) {
-        console.error('Giriş hatası:', error);
         alert('Giriş hatası: ' + error.message);
       }
     };
@@ -278,36 +249,55 @@
       let reportRef = doc(db, 'daily_reports', today);
       let report = (await getDoc(reportRef)).data() || {};
       if (!report.coops) report.coops = {};
-      coops.forEach(c => {
-        if (!report.coops[c]) report.coops[c] = {
-          dead_chicken_left: 0,
-          dead_chicken_right: 0,
-          dead_rooster_left: 0,
-          dead_rooster_right: 0,
-          tray_right_front: 0,
-          tray_right_back: 0,
-          tray_left_front: 0,
-          tray_left_back: 0,
-          water_consumption: 0,
-          temp_min: 0,
-          temp_max: 0,
-          floor_eggs: [0,0,0,0,0],
-          timestamp: today
-        };
-      });
 
+      // Yeni gün kontrolü ve sıfırlama
       const lastLoadedDate = localStorage.getItem('lastLoadedDate');
       if (!lastLoadedDate || lastLoadedDate !== today) {
+        if (lastLoadedDate) {
+          const oldReportRef = doc(db, 'daily_reports', lastLoadedDate);
+          const oldReport = (await getDoc(oldReportRef)).data() || { coops: {} };
+          if (Object.keys(oldReport.coops).length > 0) {
+            await setDoc(oldReportRef, oldReport); // Eski raporu sakla
+          }
+          // 7 günden eski raporları sil
+          const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0,10);
+          const oldReportsQuery = query(collection(db, 'daily_reports'), where('timestamp', '<', sevenDaysAgo));
+          const oldReportsSnapshot = await getDocs(oldReportsQuery);
+          oldReportsSnapshot.forEach(async (docSnap) => {
+            await deleteDoc(doc(db, 'daily_reports', docSnap.id));
+          });
+        }
+        // Yeni günü sıfırla
+        report.coops = {};
+        coops.forEach(c => {
+          report.coops[c] = {
+            dead_chicken_left: 0,
+            dead_chicken_right: 0,
+            dead_rooster_left: 0,
+            dead_rooster_right: 0,
+            tray_right_front: 0,
+            tray_right_back: 0,
+            tray_left_front: 0,
+            tray_left_back: 0,
+            water_consumption: 0,
+            temp_min: 99,
+            temp_max: -99,
+            floor_eggs: [0,0,0,0,0],
+            feed_check: false,
+            water_check: false,
+            timestamp: today
+          };
+        });
         await setDoc(reportRef, report, { merge: true });
         localStorage.setItem('lastLoadedDate', today);
       }
 
       let html = '';
       if (role === 'keeper') {
-        html = getKeeperForm(coop, report.coops[coop], today);
+        html = getKeeperForm(coop, report.coops[coop]);
       } else if (role === 'duty') {
         const myCoops = side === '1-5' ? side15 : side69;
-        html = myCoops.map(c => getDutyForm(c, report.coops[c], today)).join('');
+        html = myCoops.map(c => getDutyForm(c, report.coops[c])).join('');
       } else if (role === 'admin') {
         html = getAdminTable(report.coops) + '<button onclick="window.print()" class="btn btn-success w-100 mt-3 py-2"><i class="fas fa-print"></i> Yazdır</button>';
       }
@@ -315,21 +305,22 @@
 
       if (role !== 'admin') {
         setTimeout(() => {
-          const buttons = document.querySelectorAll('.save-btn, .edit-btn');
+          const buttons = document.querySelectorAll('.save-btn');
           buttons.forEach(btn => {
             btn.onclick = async (e) => {
               try {
                 e.preventDefault();
                 const c = btn.dataset.coop;
-                const isEdit = btn.classList.contains('edit-btn');
                 const slotElement = document.getElementById(`slot-${c}`);
                 const slot = timeSlots.indexOf(slotElement ? slotElement.value : '08:00');
                 const addDeadCL = parseInt(document.getElementById(`add-dead-cl-${c}`)?.value || 0);
                 const addDeadCR = parseInt(document.getElementById(`add-dead-cr-${c}`)?.value || 0);
                 const addDeadRL = parseInt(document.getElementById(`add-dead-rl-${c}`)?.value || 0);
                 const addDeadRR = parseInt(document.getElementById(`add-dead-rr-${c}`)?.value || 0);
-                const currentTemp = parseFloat(document.getElementById(`temp-${c}`)?.value || NaN);
+                const currentTemp = parseFloat(document.getElementById(`temp-${c}`)?.value || 0);
                 const floor = parseInt(document.getElementById(`floor-${c}`)?.value || 0);
+                const feedCheck = document.getElementById(`feed-check-${c}`).classList.contains('checked');
+                const waterCheck = document.getElementById(`water-check-${c}`).classList.contains('checked');
 
                 let data = report.coops[c];
                 data.dead_chicken_left += addDeadCL;
@@ -337,10 +328,8 @@
                 data.dead_rooster_left += addDeadRL;
                 data.dead_rooster_right += addDeadRR;
                 data.floor_eggs[slot] = floor;
-                if (!isNaN(currentTemp) && currentTemp > 0) {
-                  if (currentTemp < data.temp_min || data.temp_min === 0) data.temp_min = currentTemp;
-                  if (currentTemp > data.temp_max) data.temp_max = currentTemp;
-                }
+                if (currentTemp < data.temp_min && currentTemp > 0) data.temp_min = currentTemp;
+                if (currentTemp > data.temp_max) data.temp_max = currentTemp;
 
                 if (role === 'keeper') {
                   data.tray_right_front = parseInt(document.getElementById(`tray-rf-${c}`)?.value || 0);
@@ -352,17 +341,26 @@
                   const coopDoc = await getDoc(coopRef);
                   const lastMeter = coopDoc.exists() ? coopDoc.data().last_meter : 0;
                   data.water_consumption = currentMeter - lastMeter;
-                  await setDoc(coopRef, {last_meter: currentMeter}, { merge: true });
+                  await setDoc(coopRef, {last_meter: currentMeter});
                 }
+                data.feed_check = feedCheck;
+                data.water_check = waterCheck;
 
                 report.coops[c] = data;
                 await setDoc(reportRef, report, { merge: true });
-                alert('Veriler ' + (isEdit ? 'düzenlendi' : 'kaydedildi') + '!');
+                alert('Veriler kaydedildi!');
                 await loadDashboard(role, coop, side);
               } catch (error) {
-                console.error('Save/Edit error:', error);
-                alert('İşlem hatası: ' + error.message);
+                console.error('Save error:', error);
+                alert('Kaydetme hatası: ' + error.message);
               }
+            };
+          });
+
+          // Kontrol kutuları için tıklama eventleri
+          document.querySelectorAll('.check-box').forEach(box => {
+            box.onclick = () => {
+              box.classList.toggle('checked');
             };
           });
         }, 500);
@@ -433,39 +431,39 @@
       }
     };
 
-    function getKeeperForm(coop, data, today) {
+    function getKeeperForm(coop, data) {
       return `
         <div class="card p-4 mb-3">
           <h3>${coop} Kümes Verileri - Tarih: ${data.timestamp}</h3>
           <div class="mb-3">
             <label for="slot-${coop}" class="form-label">Giriş Saati:</label>
             <select id="slot-${coop}" class="form-control">
-              ${timeSlots.map(t => `<option ${data.timestamp === today && data.floor_eggs[timeSlots.indexOf(t)] > 0 ? 'selected' : ''}>${t}</option>`).join('')}
+              ${timeSlots.map(t => `<option>${t}</option>`).join('')}
             </select>
           </div>
           <div class="mb-3">
             <label for="add-dead-cl-${coop}" class="form-label">Ek Ölü Tavuk Sol:</label>
-            <input type="number" id="add-dead-cl-${coop}" class="form-control" value="${data.dead_chicken_left}">
+            <input type="number" id="add-dead-cl-${coop}" class="form-control" value="0">
           </div>
           <div class="mb-3">
             <label for="add-dead-cr-${coop}" class="form-label">Ek Ölü Tavuk Sağ:</label>
-            <input type="number" id="add-dead-cr-${coop}" class="form-control" value="${data.dead_chicken_right}">
+            <input type="number" id="add-dead-cr-${coop}" class="form-control" value="0">
           </div>
           <div class="mb-3">
             <label for="add-dead-rl-${coop}" class="form-label">Ek Ölü Horoz Sol:</label>
-            <input type="number" id="add-dead-rl-${coop}" class="form-control" value="${data.dead_rooster_left}">
+            <input type="number" id="add-dead-rl-${coop}" class="form-control" value="0">
           </div>
           <div class="mb-3">
             <label for="add-dead-rr-${coop}" class="form-label">Ek Ölü Horoz Sağ:</label>
-            <input type="number" id="add-dead-rr-${coop}" class="form-control" value="${data.dead_rooster_right}">
+            <input type="number" id="add-dead-rr-${coop}" class="form-control" value="0">
           </div>
           <div class="mb-3">
-            <label for="temp-${coop}" class="form-label">Geçerli Sıcaklık (°C):</label>
-            <input type="number" id="temp-${coop}" class="form-control" value="">
+            <label for="temp-${coop}" class="form-label">Geçerli Sıcaklık:</label>
+            <input type="number" id="temp-${coop}" class="form-control">
           </div>
           <div class="mb-3">
             <label for="floor-${coop}" class="form-label">Yer Yumurtası Sayısı:</label>
-            <input type="number" id="floor-${coop}" class="form-control" value="${data.floor_eggs[timeSlots.indexOf(document.getElementById(`slot-${coop}`).value) || 0] || 0}">
+            <input type="number" id="floor-${coop}" class="form-control" value="0">
           </div>
           <div class="mb-3">
             <label for="tray-rf-${coop}" class="form-label">Sağ Ön Dolu Tabak:</label>
@@ -485,50 +483,50 @@
           </div>
           <div class="mb-3">
             <label for="meter-${coop}" class="form-label">Su Sayaç Okuması:</label>
-            <input type="number" id="meter-${coop}" class="form-control" value="">
+            <input type="number" id="meter-${coop}" class="form-control">
           </div>
           <button class="btn btn-primary w-100 py-2 save-btn" data-coop="${coop}"><i class="fas fa-save"></i> Kaydet</button>
-          <button class="btn btn-info w-100 py-2 mt-2 edit-btn" data-coop="${coop}"><i class="fas fa-edit"></i> Düzenle</button>
         </div>
       `;
     }
 
-    function getDutyForm(coop, data, today) {
+    function getDutyForm(coop, data) {
       return `
         <div class="card p-4 mb-3">
           <h3>${coop} Kümes Verileri (Nöbetçi) - Tarih: ${data.timestamp}</h3>
           <div class="mb-3">
             <label for="slot-${coop}" class="form-label">Giriş Saati:</label>
             <select id="slot-${coop}" class="form-control">
-              ${timeSlots.map(t => `<option ${data.timestamp === today && data.floor_eggs[timeSlots.indexOf(t)] > 0 ? 'selected' : ''}>${t}</option>`).join('')}
+              ${timeSlots.map(t => `<option>${t}</option>`).join('')}
             </select>
           </div>
           <div class="mb-3">
             <label for="add-dead-cl-${coop}" class="form-label">Ek Ölü Tavuk Sol:</label>
-            <input type="number" id="add-dead-cl-${coop}" class="form-control" value="${data.dead_chicken_left}">
+            <input type="number" id="add-dead-cl-${coop}" class="form-control" value="0">
           </div>
           <div class="mb-3">
             <label for="add-dead-cr-${coop}" class="form-label">Ek Ölü Tavuk Sağ:</label>
-            <input type="number" id="add-dead-cr-${coop}" class="form-control" value="${data.dead_chicken_right}">
+            <input type="number" id="add-dead-cr-${coop}" class="form-control" value="0">
           </div>
           <div class="mb-3">
             <label for="add-dead-rl-${coop}" class="form-label">Ek Ölü Horoz Sol:</label>
-            <input type="number" id="add-dead-rl-${coop}" class="form-control" value="${data.dead_rooster_left}">
+            <input type="number" id="add-dead-rl-${coop}" class="form-control" value="0">
           </div>
           <div class="mb-3">
             <label for="add-dead-rr-${coop}" class="form-label">Ek Ölü Horoz Sağ:</label>
-            <input type="number" id="add-dead-rr-${coop}" class="form-control" value="${data.dead_rooster_right}">
+            <input type="number" id="add-dead-rr-${coop}" class="form-control" value="0">
           </div>
           <div class="mb-3">
-            <label for="temp-${coop}" class="form-label">Geçerli Sıcaklık (°C):</label>
-            <input type="number" id="temp-${coop}" class="form-control" value="">
+            <label for="temp-${coop}" class="form-label">Geçerli Sıcaklık:</label>
+            <input type="number" id="temp-${coop}" class="form-control">
           </div>
           <div class="mb-3">
             <label for="floor-${coop}" class="form-label">Yer Yumurtası Sayısı:</label>
-            <input type="number" id="floor-${coop}" class="form-control" value="${data.floor_eggs[timeSlots.indexOf(document.getElementById(`slot-${coop}`).value) || 0] || 0}">
+            <input type="number" id="floor-${coop}" class="form-control" value="0">
           </div>
+          <div class="check-box ${data.feed_check ? 'checked' : ''}" id="feed-check-${coop}">Dişi yemi kontrolü yapıldı</div>
+          <div class="check-box ${data.water_check ? 'checked' : ''}" id="water-check-${coop}">Suluk kontrolü yapıldı</div>
           <button class="btn btn-primary w-100 py-2 save-btn" data-coop="${coop}"><i class="fas fa-save"></i> Kaydet</button>
-          <button class="btn btn-info w-100 py-2 mt-2 edit-btn" data-coop="${coop}"><i class="fas fa-edit"></i> Düzenle</button>
         </div>
       `;
     }
@@ -547,20 +545,21 @@
       table += getTableRow('Sol Ön Dolu Tabak', coopsData, 'tray_left_front');
       table += getTableRow('Sol Arka Dolu Tabak', coopsData, 'tray_left_back');
       table += getTableRow('Su Tüketimi (Litre)', coopsData, 'water_consumption');
-      table += getTableRow('Min Sıcaklık (°C)', coopsData, 'temp_min');
-      table += getTableRow('Max Sıcaklık (°C)', coopsData, 'temp_max');
+      table += getTableRow('Min Sıcaklık', coopsData, 'temp_min');
+      table += getTableRow('Max Sıcaklık', coopsData, 'temp_max');
       table += getTableRow('Toplam Yer Yumurtası', coopsData, 'floor_eggs', true);
+      table += getTableRow('Dişi Yemi Kontrol', coopsData, 'feed_check', false, (v) => v ? 'Evet' : 'Hayır');
+      table += getTableRow('Suluk Kontrol', coopsData, 'water_check', false, (v) => v ? 'Evet' : 'Hayır');
       table += '</tbody></table>';
       return table;
     }
 
-    function getTableRow(label, data, key, sum=false) {
+    function getTableRow(label, data, key, sum=false, format=(v) => v) {
       let row = `<tr><td>${label}</td>`;
       coops.forEach(c => {
         let val = data[c][key];
         if (sum) val = val.reduce((a,b)=>a+b,0);
-        if (key === 'temp_min' || key === 'temp_max') val += ' ℃';
-        row += `<td>${val !== undefined ? val : 'N/A'}</td>`;
+        row += `<td>${val !== undefined ? format(val) : 'N/A'}</td>`;
       });
       row += '</tr>';
       return row;
