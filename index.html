@@ -191,9 +191,21 @@
     const timeSlots = ['08:00', '09:00', '10:15', '13:00', '14:15'];
 
     window.login = async () => {
-      const username = document.getElementById('username').value;
-      const password = document.getElementById('password').value;
       try {
+        const usernameInput = document.getElementById('username');
+        const passwordInput = document.getElementById('password');
+        if (!usernameInput || !passwordInput) {
+          alert('Kullanıcı adı veya şifre alanı bulunamadı!');
+          return;
+        }
+
+        const username = usernameInput.value;
+        const password = passwordInput.value;
+        if (!username || !password) {
+          alert('Kullanıcı adı ve şifre giriniz!');
+          return;
+        }
+
         const userCredential = await signInAnonymously(auth);
         const user = userCredential.user;
         const userDoc = await getDoc(doc(db, 'users', username));
@@ -210,6 +222,7 @@
           auth.signOut();
         }
       } catch (error) {
+        console.error('Giriş hatası:', error);
         alert('Giriş hatası: ' + error.message);
       }
     };
@@ -271,7 +284,6 @@
         };
       });
 
-      // Yeni gün için rapor sıfırlama
       const lastLoadedDate = localStorage.getItem('lastLoadedDate');
       if (!lastLoadedDate || lastLoadedDate !== today) {
         await setDoc(reportRef, report, { merge: true });
