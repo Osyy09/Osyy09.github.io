@@ -319,8 +319,10 @@
                 const addDeadRR = parseInt(document.getElementById(`add-dead-rr-${c}`)?.value || 0);
                 const currentTemp = parseFloat(document.getElementById(`temp-${c}`)?.value || 0);
                 const floor = parseInt(document.getElementById(`floor-${c}`)?.value || 0);
-                const feedCheck = document.getElementById(`feed-check-${c}`).classList.contains('checked');
-                const waterCheck = document.getElementById(`water-check-${c}`).classList.contains('checked');
+                const feedCheckElement = document.getElementById(`feed-check-${c}`);
+                const waterCheckElement = document.getElementById(`water-check-${c}`);
+                const feedCheck = feedCheckElement ? feedCheckElement.classList.contains('checked') : false;
+                const waterCheck = waterCheckElement ? waterCheckElement.classList.contains('checked') : false;
 
                 let data = report.coops[c];
                 data.dead_chicken_left += addDeadCL;
@@ -363,7 +365,7 @@
               box.classList.toggle('checked');
             };
           });
-        }, 500);
+        }, 1000); // Gecikme süresini 1 saniyeye uzattık
       }
     }
 
