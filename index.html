@@ -133,7 +133,7 @@
       <div class="mb-3">
         <input type="password" id="password" class="form-control mb-2" placeholder="Şifre">
       </div>
-      <button onclick="login()" class="btn btn-primary w-100 py-2"><i class="fas fa-sign-in-alt"></i> Giriş</button>
+      <button id="loginButton" class="btn btn-primary w-100 py-2"><i class="fas fa-sign-in-alt"></i> Giriş</button>
     </div>
     <div id="dashboard" style="display:none;" class="mt-4">
       <ul class="nav nav-tabs" id="dashboardTabs">
@@ -190,17 +190,29 @@
     const side69 = coops.slice(10);
     const timeSlots = ['08:00', '09:00', '10:15', '13:00', '14:15'];
 
+    document.addEventListener('DOMContentLoaded', () => {
+      const loginButton = document.getElementById('loginButton');
+      if (loginButton) {
+        loginButton.addEventListener('click', login);
+      } else {
+        console.error('Login button not found!');
+      }
+    });
+
     window.login = async () => {
       try {
         const usernameInput = document.getElementById('username');
         const passwordInput = document.getElementById('password');
+        console.log('Username Input:', usernameInput);
+        console.log('Password Input:', passwordInput);
+
         if (!usernameInput || !passwordInput) {
           alert('Kullanıcı adı veya şifre alanı bulunamadı!');
           return;
         }
 
-        const username = usernameInput.value;
-        const password = passwordInput.value;
+        const username = usernameInput.value.trim();
+        const password = passwordInput.value.trim();
         if (!username || !password) {
           alert('Kullanıcı adı ve şifre giriniz!');
           return;
