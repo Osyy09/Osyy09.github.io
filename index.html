@@ -1,99 +1,231 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gelişmiş Kripto Takip ve Hesaplayıcı</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EC Çiftlik Rapor Sistemi</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
-    <div class="main-container">
-        <div class="card">
-            <h1>Coin Watcher</h1>
-            <p class="section-description">Cüzdan hareketlerini takip etmek için API anahtarlarınızı girin ve coinlerinizi ekleyin.</p>
-            
-            <div class="input-group">
-                <label for="etherscanApiKey">Etherscan API Anahtarı:</label>
-                <input type="text" id="etherscanApiKey" placeholder="Etherscan Anahtarınızı Girin">
-            </div>
-            
-            <div class="input-group">
-                <label for="mobulaApiKey">Mobula API Anahtarı:</label>
-                <input type="text" id="mobulaApiKey" placeholder="Mobula Anahtarınızı Girin (isteğe bağlı)">
-            </div>
-
-            <button class="primary-button" onclick="saveApiKeys()">API Anahtarlarını Kaydet</button>
-            <hr class="divider">
-            
-            <div class="input-group">
-                <label for="numberOfCoins">Takip Edilecek Coin Sayısı:</label>
-                <div class="inline-input">
-                    <input type="number" id="numberOfCoins" placeholder="Örn: 3">
-                    <button class="secondary-button" onclick="createCoinInputs()">Alanları Oluştur</button>
-                </div>
-            </div>
-
-            <div id="coinInputsContainer"></div>
-            <button id="saveCoinsBtn" class="primary-button" style="display:none;" onclick="saveCoinConfigs()">Coinleri Kaydet ve Başlat</button>
-            <button id="stopTrackingBtn" class="secondary-button" style="display:none;" onclick="stopTracking()">Takibi Durdur</button>
-            
-            <hr class="divider">
-            
-            <div id="coinButtonsContainer" class="coin-buttons-list"></div>
-        </div>
-
-        <div class="card">
-            <h1>Kripto Potansiyel Hesaplayıcı</h1>
-            <p class="section-description">Bir altcoin'in geçmişteki piyasa değeri zirvesini kullanarak potansiyel fiyatını ve getirisini hesaplayın.</p>
-
-            <div class="input-group">
-                <label for="coinSelect">Kripto Para Birimi Seç:</label>
-                <select id="coinSelect" onchange="coinSecildi()"></select>
-            </div>
-
-            <div id="ralliVerileri" style="display:none;">
-                <div class="input-group">
-                    <label for="ralliSelect">Ralli Dönemi Seç:</label>
-                    <select id="ralliSelect"></select>
-                </div>
-            </div>
-            
-            <div id="bilgiAlani" class="info-box" style="display:none;">
-               <p>Güncel Dolaşımdaki Arz: <strong id="bugunkuArz">...</strong></p>
-            </div>
-
-            <div class="input-group">
-                <label for="maliyetFiyati">Ortalama Maliyet Fiyatı (İsteğe Bağlı):</label>
-                <input type="number" id="maliyetFiyati" placeholder="Örn: 0.85" min="0">
-            </div>
-            
-            <button class="primary-button" onclick="hesapla()">Potansiyel Fiyatı Hesapla</button>
-
-            <div id="sonucAlani" class="result-box"></div>
-
-            <hr class="divider">
-
-            <h2>Manuel Coin Ekle</h2>
-            <div class="input-group">
-                <label for="manualCoinName">Coin Adı:</label>
-                <input type="text" id="manualCoinName" placeholder="Örn: SHIBA">
-            </div>
-            <div class="input-group">
-                <label for="manualRallyYear">Ralli Dönemi Adı:</label>
-                <input type="text" id="manualRallyYear" placeholder="Örn: 2021 Rallisi">
-            </div>
-            <div class="input-group">
-                <label for="manualAthMarketCap">ATH Piyasa Değeri ($):</label>
-                <input type="number" id="manualAthMarketCap" placeholder="Örn: 41000000000">
-            </div>
-            <button class="secondary-button" onclick="addManualCoin()">Coin'i Ekle</button>
-        </div>
+  <div class="container mt-5">
+    <h1 class="text-center">EC Hayvancılık Günlük Rapor Sistemi</h1>
+    <div id="login-form" class="card p-4">
+      <h2>Giriş Yap</h2>
+      <input type="text" id="username" class="form-control mb-2" placeholder="Kullanıcı Adı">
+      <input type="password" id="password" class="form-control mb-2" placeholder="Şifre">
+      <button onclick="login()" class="btn btn-primary">Giriş</button>
     </div>
+    <div id="dashboard" style="display:none;"></div>
+  </div>
 
-    <script src="script.js"></script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-auth.js";
+    import { getFirestore, doc, getDoc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+  apiKey: "AIzaSyCildgfGrsyzGkOC6ClKHji_HunnJC3r2k",
+  authDomain: "ec-farm-report-1d359.firebaseapp.com",
+  projectId: "ec-farm-report-1d359",
+  storageBucket: "ec-farm-report-1d359.firebasestorage.app",
+  messagingSenderId: "751990003577",
+  appId: "1:751990003577:web:e9036a63855828134e01a8"
+};
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    const coops = ['1A', '1B', '2A', '2B', '3A', '3B', '4A', '4B', '5A', '5B', '6A', '6B', '7A', '7B', '8A', '8B', '9A', '9B'];
+    const side15 = coops.slice(0,10);
+    const side69 = coops.slice(10);
+
+    window.login = async () => {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      try {
+        const userCredential = await signInAnonymously(auth);
+        const user = userCredential.user;
+        const userDoc = await getDoc(doc(db, 'users', username));
+        if (userDoc.exists() && userDoc.data().password === password) {
+          localStorage.setItem('currentUser', username);
+          loadDashboard(userDoc.data().role, userDoc.data().coop, userDoc.data().side);
+        } else {
+          alert('Geçersiz kullanıcı adı veya şifre!');
+          auth.signOut();
+        }
+      } catch (error) {
+        alert('Giriş hatası: ' + error.message);
+      }
+    };
+
+    onAuthStateChanged(auth, async (user) => {
+      if (user && localStorage.getItem('currentUser')) {
+        document.getElementById('login-form').style.display = 'none';
+        document.getElementById('dashboard').style.display = 'block';
+        const username = localStorage.getItem('currentUser');
+        const userDoc = await getDoc(doc(db, 'users', username));
+        const role = userDoc.data().role;
+        const coop = userDoc.data().coop;
+        const side = userDoc.data().side;
+        loadDashboard(role, coop, side);
+      } else {
+        document.getElementById('login-form').style.display = 'block';
+        document.getElementById('dashboard').style.display = 'none';
+        localStorage.removeItem('currentUser');
+      }
+    });
+
+    async function loadDashboard(role, coop, side) {
+      const today = new Date().toISOString().slice(0,10);
+      const reportRef = doc(db, 'daily_reports', today);
+      let report = (await getDoc(reportRef)).data() || {};
+      if (!report.coops) report.coops = {};
+      coops.forEach(c => {
+        if (!report.coops[c]) report.coops[c] = {
+          dead_chicken_left: 0,
+          dead_chicken_right: 0,
+          dead_rooster_left: 0,
+          dead_rooster_right: 0,
+          tray_right_front: 0,
+          tray_right_back: 0,
+          tray_left_front: 0,
+          tray_left_back: 0,
+          water_consumption: 0,
+          temp_min: 99,
+          temp_max: -99,
+          floor_eggs: [0,0,0,0,0]
+        };
+      });
+
+      let html = '';
+      if (role === 'keeper') {
+        html = getKeeperForm(coop, report.coops[coop]);
+      } else if (role === 'duty') {
+        const myCoops = side === '1-5' ? side15 : side69;
+        html = myCoops.map(c => getDutyForm(c, report.coops[c])).join('');
+      } else if (role === 'admin') {
+        html = getAdminTable(report.coops) + '<button onclick="window.print()" class="btn btn-success mt-3">Yazdır</button>';
+      }
+      document.getElementById('dashboard').innerHTML = html;
+
+      if (role !== 'admin') {
+        document.querySelectorAll('.save-btn').forEach(btn => {
+          btn.onclick = async () => {
+            const c = btn.dataset.coop;
+            const slot = parseInt(document.getElementById(`slot-${c}`).value) - 1;
+            const addDeadCL = parseInt(document.getElementById(`add-dead-cl-${c}`).value || 0);
+            const addDeadCR = parseInt(document.getElementById(`add-dead-cr-${c}`).value || 0);
+            const addDeadRL = parseInt(document.getElementById(`add-dead-rl-${c}`).value || 0);
+            const addDeadRR = parseInt(document.getElementById(`add-dead-rr-${c}`).value || 0);
+            const currentTemp = parseFloat(document.getElementById(`temp-${c}`).value || 0);
+            const floor = parseInt(document.getElementById(`floor-${c}`).value || 0);
+
+            let data = report.coops[c];
+            data.dead_chicken_left += addDeadCL;
+            data.dead_chicken_right += addDeadCR;
+            data.dead_rooster_left += addDeadRL;
+            data.dead_rooster_right += addDeadRR;
+            data.floor_eggs[slot] = floor;
+            if (currentTemp < data.temp_min && currentTemp > 0) data.temp_min = currentTemp;
+            if (currentTemp > data.temp_max) data.temp_max = currentTemp;
+
+            if (role === 'keeper') {
+              data.tray_right_front = parseInt(document.getElementById(`tray-rf-${c}`).value || 0);
+              data.tray_right_back = parseInt(document.getElementById(`tray-rb-${c}`).value || 0);
+              data.tray_left_front = parseInt(document.getElementById(`tray-lf-${c}`).value || 0);
+              data.tray_left_back = parseInt(document.getElementById(`tray-lb-${c}`).value || 0);
+              const currentMeter = parseInt(document.getElementById(`meter-${c}`).value || 0);
+              const coopRef = doc(db, 'coops', c);
+              const coopDoc = await getDoc(coopRef);
+              const lastMeter = coopDoc.exists() ? coopDoc.data().last_meter : 0;
+              data.water_consumption = currentMeter - lastMeter;
+              await setDoc(coopRef, {last_meter: currentMeter});
+            }
+
+            report.coops[c] = data;
+            await setDoc(reportRef, report);
+            alert('Veriler kaydedildi!');
+            loadDashboard(role, coop, side);
+          };
+        });
+      }
+    }
+
+    function getKeeperForm(coop, data) {
+      return `
+        <div class="card p-4 mb-3">
+          <h3>${coop} Kümes Verileri</h3>
+          <label>Toplama Slotu (1-5):</label>
+          <select id="slot-${coop}" class="form-control mb-2">
+            <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+          </select>
+          <label>Ek Ölü Tavuk Sol:</label><input type="number" id="add-dead-cl-${coop}" class="form-control mb-2" value="0">
+          <label>Ek Ölü Tavuk Sağ:</label><input type="number" id="add-dead-cr-${coop}" class="form-control mb-2" value="0">
+          <label>Ek Ölü Horoz Sol:</label><input type="number" id="add-dead-rl-${coop}" class="form-control mb-2" value="0">
+          <label>Ek Ölü Horoz Sağ:</label><input type="number" id="add-dead-rr-${coop}" class="form-control mb-2" value="0">
+          <label>Geçerli Sıcaklık:</label><input type="number" id="temp-${coop}" class="form-control mb-2">
+          <label>Yer Yumurtası Sayısı (bu slot için):</label><input type="number" id="floor-${coop}" class="form-control mb-2" value="0">
+          <label>Sağ Ön Dolu Tabak:</label><input type="number" id="tray-rf-${coop}" class="form-control mb-2" value="${data.tray_right_front}">
+          <label>Sağ Arka Dolu Tabak:</label><input type="number" id="tray-rb-${coop}" class="form-control mb-2" value="${data.tray_right_back}">
+          <label>Sol Ön Dolu Tabak:</label><input type="number" id="tray-lf-${coop}" class="form-control mb-2" value="${data.tray_left_front}">
+          <label>Sol Arka Dolu Tabak:</label><input type="number" id="tray-lb-${coop}" class="form-control mb-2" value="${data.tray_left_back}">
+          <label>Su Sayaç Okuması (güncel):</label><input type="number" id="meter-${coop}" class="form-control mb-2">
+          <button class="btn btn-primary save-btn" data-coop="${coop}">Kaydet</button>
+        </div>
+      `;
+    }
+
+    function getDutyForm(coop, data) {
+      return `
+        <div class="card p-4 mb-3">
+          <h3>${coop} Kümes Verileri (Nöbetçi)</h3>
+          <label>Toplama Slotu (1-5):</label>
+          <select id="slot-${coop}" class="form-control mb-2">
+            <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+          </select>
+          <label>Ek Ölü Tavuk Sol:</label><input type="number" id="add-dead-cl-${coop}" class="form-control mb-2" value="0">
+          <label>Ek Ölü Tavuk Sağ:</label><input type="number" id="add-dead-cr-${coop}" class="form-control mb-2" value="0">
+          <label>Ek Ölü Horoz Sol:</label><input type="number" id="add-dead-rl-${coop}" class="form-control mb-2" value="0">
+          <label>Ek Ölü Horoz Sağ:</label><input type="number" id="add-dead-rr-${coop}" class="form-control mb-2" value="0">
+          <label>Geçerli Sıcaklık:</label><input type="number" id="temp-${coop}" class="form-control mb-2">
+          <label>Yer Yumurtası Sayısı (bu slot için):</label><input type="number" id="floor-${coop}" class="form-control mb-2" value="0">
+          <button class="btn btn-primary save-btn" data-coop="${coop}">Kaydet</button>
+        </div>
+      `;
+    }
+
+    function getAdminTable(coopsData) {
+      let table = '<table class="table table-bordered"><thead><tr><th>Veri Türü</th>';
+      coops.forEach(c => table += `<th>${c}</th>`);
+      table += '</tr></thead><tbody>';
+      table += getTableRow('Ölü Tavuk Sol', coopsData, 'dead_chicken_left');
+      table += getTableRow('Ölü Tavuk Sağ', coopsData, 'dead_chicken_right');
+      table += getTableRow('Ölü Horoz Sol', coopsData, 'dead_rooster_left');
+      table += getTableRow('Ölü Horoz Sağ', coopsData, 'dead_rooster_right');
+      table += getTableRow('Sağ Ön Dolu Tabak', coopsData, 'tray_right_front');
+      table += getTableRow('Sağ Arka Dolu Tabak', coopsData, 'tray_right_back');
+      table += getTableRow('Sol Ön Dolu Tabak', coopsData, 'tray_left_front');
+      table += getTableRow('Sol Arka Dolu Tabak', coopsData, 'tray_left_back');
+      table += getTableRow('Su Tüketimi (Litre)', coopsData, 'water_consumption');
+      table += getTableRow('Min Sıcaklık', coopsData, 'temp_min');
+      table += getTableRow('Max Sıcaklık', coopsData, 'temp_max');
+      table += getTableRow('Toplam Yer Yumurtası', coopsData, 'floor_eggs', true);
+      table += '</tbody></table>';
+      return table;
+    }
+
+    function getTableRow(label, data, key, sum=false) {
+      let row = `<tr><td>${label}</td>`;
+      coops.forEach(c => {
+        let val = data[c][key];
+        if (sum) val = val.reduce((a,b)=>a+b,0);
+        row += `<td>${val}</td>`;
+      });
+      row += '</tr>';
+      return row;
+    }
+  </script>
 </body>
 </html>
