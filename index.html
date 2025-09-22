@@ -18,6 +18,16 @@
     </div>
     <div id="dashboard" style="display:none;">
       <div id="dashboard-content"></div>
+      <div id="change-credentials" style="display:none;" class="card p-4 mt-3">
+        <h3>Kullanıcı Bilgilerini Değiştir</h3>
+        <div id="user-select" style="display:none;">
+          <label>Kullanıcı Seç:</label>
+          <select id="target-user" class="form-control mb-2"></select>
+        </div>
+        <input type="text" id="new-username" class="form-control mb-2" placeholder="Yeni Kullanıcı Adı">
+        <input type="password" id="new-password" class="form-control mb-2" placeholder="Yeni Şifre">
+        <button onclick="changeCredentials()" class="btn btn-warning">Değiştir</button>
+      </div>
       <button onclick="logout()" class="btn btn-danger mt-3">Çıkış Yap</button>
     </div>
   </div>
@@ -25,7 +35,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js";
     import { getAuth, signInAnonymously, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-auth.js";
-    import { getFirestore, doc, getDoc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-firestore.js";
+    import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, query, where, getDocs, limit, collection } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyCildgfGrsyzGkOC6ClKHji_HunnJC3r2k",
@@ -43,6 +53,7 @@
     const coops = ['1A', '1B', '2A', '2B', '3A', '3B', '4A', '4B', '5A', '5B', '6A', '6B', '7A', '7B', '8A', '8B', '9A', '9B'];
     const side15 = coops.slice(0,10);
     const side69 = coops.slice(10);
+    const timeSlots = ['08:00', '09:00', '10:15', '13:00', '14:15'];
 
     window.login = async () => {
       const username = document.getElementById('username').value;
@@ -53,7 +64,9 @@
         const userDoc = await getDoc(doc(db, 'users', username));
         if (userDoc.exists() && userDoc.data().password === password) {
           localStorage.setItem('currentUser', username);
-          loadDashboard(userDoc.data().role, userDoc.data().coop, userDoc.data().side);
+          await loadDashboard(userDoc.data().role, userDoc.data().coop, userDoc.data().side);
+          document.getElementById('login-form').style.display = 'none';
+          document.getElementById('dashboard').style.display = 'block';
         } else {
           alert('Geçersiz kullanıcı adı veya şifre!');
           auth.signOut();
@@ -69,6 +82,7 @@
         localStorage.removeItem('currentUser');
         document.getElementById('login-form').style.display = 'block';
         document.getElementById('dashboard').style.display = 'none';
+        document.getElementById('change-credentials').style.display = 'none';
         alert('Çıkış yapıldı!');
       } catch (error) {
         alert('Çıkış hatası: ' + error.message);
@@ -84,7 +98,8 @@
         const role = userDoc.data().role;
         const coop = userDoc.data().coop;
         const side = userDoc.data().side;
-        loadDashboard(role, coop, side);
+        await loadDashboard(role, coop, side);
+        setupChangeCredentials(role, username);
       } else {
         document.getElementById('login-form').style.display = 'block';
         document.getElementById('dashboard').style.display = 'none';
@@ -110,8 +125,16 @@
           water_consumption: 0,
           temp_min: 99,
           temp_max: -99,
-          floor_eggs: [0,0,0,0,0]
+          floor_eggs: [0,0,0,0,0],
+          timestamp: today
         };
+      });
+
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0,10);
+      const reportsQuery = query(collection(db, 'daily_reports'), where('timestamp', '<', sevenDaysAgo));
+      const querySnapshot = await getDocs(reportsQuery);
+      querySnapshot.forEach(async (docSnap) => {
+        await deleteDoc(doc(db, 'daily_reports', docSnap.id));
       });
 
       let html = '';
@@ -129,7 +152,7 @@
         document.querySelectorAll('.save-btn').forEach(btn => {
           btn.onclick = async () => {
             const c = btn.dataset.coop;
-            const slot = parseInt(document.getElementById(`slot-${c}`).value) - 1;
+            const slot = timeSlots.indexOf(document.getElementById(`slot-${c}`).value);
             const addDeadCL = parseInt(document.getElementById(`add-dead-cl-${c}`).value || 0);
             const addDeadCR = parseInt(document.getElementById(`add-dead-cr-${c}`).value || 0);
             const addDeadRL = parseInt(document.getElementById(`add-dead-rl-${c}`).value || 0);
@@ -168,20 +191,80 @@
       }
     }
 
+    function setupChangeCredentials(role, currentUser) {
+      const changeCredentialsDiv = document.getElementById('change-credentials');
+      changeCredentialsDiv.style.display = role === 'admin' || role === 'keeper' ? 'block' : 'none';
+
+      if (role === 'admin') {
+        document.getElementById('user-select').style.display = 'block';
+        loadUserList();
+      } else {
+        document.getElementById('user-select').style.display = 'none';
+        document.getElementById('target-user').value = currentUser;
+      }
+    }
+
+    async function loadUserList() {
+      const usersRef = collection(db, 'users');
+      const querySnapshot = await getDocs(usersRef);
+      const select = document.getElementById('target-user');
+      select.innerHTML = '';
+      querySnapshot.forEach((doc) => {
+        const user = doc.id;
+        const option = document.createElement('option');
+        option.value = user;
+        option.text = user;
+        select.appendChild(option);
+      });
+    }
+
+    window.changeCredentials = async () => {
+      const currentUser = localStorage.getItem('currentUser');
+      const userDoc = await getDoc(doc(db, 'users', currentUser));
+      const role = userDoc.data().role;
+      const targetUser = role === 'admin' ? document.getElementById('target-user').value : currentUser;
+      const newUsername = document.getElementById('new-username').value;
+      const newPassword = document.getElementById('new-password').value;
+
+      if (!newUsername && !newPassword) {
+        alert('Yeni kullanıcı adı veya şifre giriniz!');
+        return;
+      }
+
+      try {
+        const userRef = doc(db, 'users', targetUser);
+        const userData = (await getDoc(userRef)).data();
+        if (newUsername) userData.username = newUsername;
+        if (newPassword) userData.password = newPassword;
+
+        await updateDoc(userRef, userData);
+        alert('Kullanıcı bilgileri başarıyla değiştirildi!');
+        if (role === 'admin') {
+          loadUserList(); // Dropdown'u güncelle
+        } else {
+          localStorage.setItem('currentUser', newUsername || currentUser); // Kullanıcı adını güncelle
+        }
+        document.getElementById('new-username').value = '';
+        document.getElementById('new-password').value = '';
+      } catch (error) {
+        alert('Hata oluştu: ' + error.message);
+      }
+    };
+
     function getKeeperForm(coop, data) {
       return `
         <div class="card p-4 mb-3">
-          <h3>${coop} Kümes Verileri</h3>
-          <label>Toplama Slotu (1-5):</label>
+          <h3>${coop} Kümes Verileri - Tarih: ${data.timestamp}</h3>
+          <label>Giriş Saati:</label>
           <select id="slot-${coop}" class="form-control mb-2">
-            <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+            ${timeSlots.map(t => `<option>${t}</option>`).join('')}
           </select>
           <label>Ek Ölü Tavuk Sol:</label><input type="number" id="add-dead-cl-${coop}" class="form-control mb-2" value="0">
           <label>Ek Ölü Tavuk Sağ:</label><input type="number" id="add-dead-cr-${coop}" class="form-control mb-2" value="0">
           <label>Ek Ölü Horoz Sol:</label><input type="number" id="add-dead-rl-${coop}" class="form-control mb-2" value="0">
           <label>Ek Ölü Horoz Sağ:</label><input type="number" id="add-dead-rr-${coop}" class="form-control mb-2" value="0">
           <label>Geçerli Sıcaklık:</label><input type="number" id="temp-${coop}" class="form-control mb-2">
-          <label>Yer Yumurtası Sayısı (bu slot için):</label><input type="number" id="floor-${coop}" class="form-control mb-2" value="0">
+          <label>Yer Yumurtası Sayısı (bu saat için):</label><input type="number" id="floor-${coop}" class="form-control mb-2" value="0">
           <label>Sağ Ön Dolu Tabak:</label><input type="number" id="tray-rf-${coop}" class="form-control mb-2" value="${data.tray_right_front}">
           <label>Sağ Arka Dolu Tabak:</label><input type="number" id="tray-rb-${coop}" class="form-control mb-2" value="${data.tray_right_back}">
           <label>Sol Ön Dolu Tabak:</label><input type="number" id="tray-lf-${coop}" class="form-control mb-2" value="${data.tray_left_front}">
@@ -195,17 +278,17 @@
     function getDutyForm(coop, data) {
       return `
         <div class="card p-4 mb-3">
-          <h3>${coop} Kümes Verileri (Nöbetçi)</h3>
-          <label>Toplama Slotu (1-5):</label>
+          <h3>${coop} Kümes Verileri (Nöbetçi) - Tarih: ${data.timestamp}</h3>
+          <label>Giriş Saati:</label>
           <select id="slot-${coop}" class="form-control mb-2">
-            <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+            ${timeSlots.map(t => `<option>${t}</option>`).join('')}
           </select>
           <label>Ek Ölü Tavuk Sol:</label><input type="number" id="add-dead-cl-${coop}" class="form-control mb-2" value="0">
           <label>Ek Ölü Tavuk Sağ:</label><input type="number" id="add-dead-cr-${coop}" class="form-control mb-2" value="0">
           <label>Ek Ölü Horoz Sol:</label><input type="number" id="add-dead-rl-${coop}" class="form-control mb-2" value="0">
           <label>Ek Ölü Horoz Sağ:</label><input type="number" id="add-dead-rr-${coop}" class="form-control mb-2" value="0">
           <label>Geçerli Sıcaklık:</label><input type="number" id="temp-${coop}" class="form-control mb-2">
-          <label>Yer Yumurtası Sayısı (bu slot için):</label><input type="number" id="floor-${coop}" class="form-control mb-2" value="0">
+          <label>Yer Yumurtası Sayısı (bu saat için):</label><input type="number" id="floor-${coop}" class="form-control mb-2" value="0">
           <button class="btn btn-primary save-btn" data-coop="${coop}">Kaydet</button>
         </div>
       `;
@@ -215,6 +298,7 @@
       let table = '<table class="table table-bordered"><thead><tr><th>Veri Türü</th>';
       coops.forEach(c => table += `<th>${c}</th>`);
       table += '</tr></thead><tbody>';
+      table += getTableRow('Tarih', coopsData, 'timestamp');
       table += getTableRow('Ölü Tavuk Sol', coopsData, 'dead_chicken_left');
       table += getTableRow('Ölü Tavuk Sağ', coopsData, 'dead_chicken_right');
       table += getTableRow('Ölü Horoz Sol', coopsData, 'dead_rooster_left');
