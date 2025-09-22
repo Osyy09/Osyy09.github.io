@@ -35,7 +35,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js";
     import { getAuth, signInAnonymously, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-auth.js";
-    import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, query, where, getDocs, limit, collection } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-firestore.js";
+    import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, query, where, getDocs, collection } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyCildgfGrsyzGkOC6ClKHji_HunnJC3r2k",
@@ -232,17 +232,31 @@
       }
 
       try {
-        const userRef = doc(db, 'users', targetUser);
-        const userData = (await getDoc(userRef)).data();
-        if (newUsername) userData.username = newUsername;
-        if (newPassword) userData.password = newPassword;
+        const oldUserRef = doc(db, 'users', targetUser);
+        const oldUserData = (await getDoc(oldUserRef)).data();
 
-        await updateDoc(userRef, userData);
+        if (newUsername) {
+          // Yeni kullanıcı adıyla yeni bir doküman oluştur
+          const newUserRef = doc(db, 'users', newUsername);
+          await setDoc(newUserRef, {
+            role: oldUserData.role,
+            coop: oldUserData.coop,
+            password: newPassword || oldUserData.password,
+            side: oldUserData.side
+          });
+          // Eski dokümanı sil
+          await deleteDoc(oldUserRef);
+          if (targetUser === currentUser) {
+            localStorage.setItem('currentUser', newUsername);
+          }
+        } else if (newPassword) {
+          // Sadece şifre değiştir
+          await updateDoc(oldUserRef, { password: newPassword });
+        }
+
         alert('Kullanıcı bilgileri başarıyla değiştirildi!');
         if (role === 'admin') {
           loadUserList(); // Dropdown'u güncelle
-        } else {
-          localStorage.setItem('currentUser', newUsername || currentUser); // Kullanıcı adını güncelle
         }
         document.getElementById('new-username').value = '';
         document.getElementById('new-password').value = '';
